@@ -1,0 +1,235 @@
+:root {
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --secondary: #db2777;
+    /* Pink for Pakkred */
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+.animate-shake {
+    animation: shake 0.3s ease-in-out;
+}
+
+body {
+    font-family: 'Kanit', sans-serif;
+    background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+    background-attachment: fixed;
+    color: #1e293b;
+    width: 100vw;
+    overflow-x: hidden;
+}
+
+/* Mobile horizontal scroll prevention */
+html,
+body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+#main-scroll-container {
+    overflow-x: hidden;
+}
+
+/* Modern Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Selection */
+::selection {
+    background-color: #fbcfe8;
+    /* Pink-200 */
+    color: #be185d;
+    /* Pink-700 */
+}
+
+/* Glassmorphism Utility */
+.glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.slide-in-right {
+    animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.hover-lift {
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+}
+
+.hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px -10px rgba(37, 99, 235, 0.15), 0 4px 6px -2px rgba(37, 99, 235, 0.05);
+}
+
+.radio-card:checked+div {
+    border-color: #2563EB;
+    background-color: #EFF6FF;
+    color: #1E40AF;
+}
+
+/* Toast Animation */
+.toast-enter {
+    transform: translateX(100%);
+    opacity: 0;
+}
+
+.toast-enter-active {
+    transform: translateX(0);
+    opacity: 1;
+    transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.toast-exit {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-exit-active {
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease-in;
+}
+
+/* File Upload Styles */
+.file-upload-zone {
+    border: 2px dashed #e2e8f0;
+    background: #f8fafc;
+    transition: all 0.2s ease;
+}
+
+.file-upload-zone:hover {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.file-upload-zone.drag-over {
+    border-color: #3b82f6;
+    background-color: #dbeafe;
+    transform: scale(1.01);
+}
+
+.file-upload-zone.has-file {
+    border-color: #22c55e;
+    background-color: #f0fdf4;
+}
+
+@media print {
+    body * {
+        visibility: hidden;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    #view-pending-rewards,
+    #view-pending-rewards * {
+        visibility: visible;
+    }
+
+    #view-pending-rewards {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        display: block !important;
+        background: white;
+    }
+
+    .print\:hidden {
+        display: none !important;
+    }
+
+    /* Enforce Background Colors */
+    tr.bg-yellow-300 {
+        background-color: #fde047 !important;
+    }
+
+    td,
+    th {
+        border: 1px solid #e5e7eb !important;
+    }
+
+    aside,
+    header,
+    #nav-drawer,
+    #toast-container,
+    #detail-modal,
+    #student-modal,
+    #teacher-modal,
+    #loading {
+        display: none !important;
+    }
+}

@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Achievement Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#db2777',
+                    }
+                }
+            }
+        }
+    </script>
+    <script>
+        // Theme Initialization
+        if (localStorage.theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.theme = 'light';
+        }
+
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+            updateThemeIcons();
+        }
+
+        function updateThemeIcons() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const icons = document.querySelectorAll('.theme-toggle-icon');
+            icons.forEach(icon => {
+                if (isDark) {
+                    icon.setAttribute('data-lucide', 'sun');
+                } else {
+                    icon.setAttribute('data-lucide', 'moon');
+                }
+            });
+            if (window.lucide) lucide.createIcons();
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="text-gray-800 min-h-screen flex flex-col items-center">
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Navigation Drawer (Sidebar) -->
+    <div id="nav-drawer" class="fixed inset-0 z-50 invisible md:hidden">
+        <!-- Backdrop -->
+        <div id="drawer-backdrop" class="absolute inset-0 bg-black/0 transition-colors duration-300"
+            onclick="toggleDrawer()"></div>
+
+        <!-- Drawer Content -->
+        <div id="drawer-content"
+            class="absolute inset-y-0 left-0 w-64 bg-white shadow-xl flex flex-col transform -translate-x-full transition-transform duration-300 ease-in-out">
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-bold text-gray-800">เมนูหลัก</h2>
+                <button onclick="toggleDrawer()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <nav class="flex-grow p-4 space-y-2">
+                <button onclick="switchView('dashboard'); toggleDrawer()"
+                    class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
+                    <i data-lucide="trophy" class="w-5 h-5"></i>
+                    <span>ผลงานทั้งหมด</span>
+                </button>
+                <button onclick="switchView('form'); toggleDrawer()"
+                    class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    <span>เพิ่มข้อมูลใหม่</span>
+                </button>
+                <button onclick="switchView('subject-summary'); toggleDrawer()"
+                    class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
+                    <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                    <span>สรุปตามกลุ่มสาระฯ</span>
+                </button>
+                <button onclick="switchView('pending-rewards'); toggleDrawer()"
+                    class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
+                    <i data-lucide="clock" class="w-5 h-5"></i>
+                    <span>รางวัลรอรับ (experiment)</span>
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-100 text-xs text-center text-gray-400">
+                v1.1.0 Beta
+            </div>
+        </div>
+    </div>
+
+    <!-- App Shell Container -->
+    <!-- Responsive App Layout -->
+    <div class="flex h-screen w-full bg-gray-50 overflow-hidden">
+
+        <!-- Desktop Sidebar (Visible lg+) -->
+        <aside
+            class="hidden lg:flex w-72 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex-col shrink-0 z-30 transition-colors duration-300">
+            <!-- Sidebar Header -->
+            <div class="h-20 flex items-center px-6 border-b border-gray-100 dark:border-slate-800 gap-3">
+                <!-- TODO: Replace src with actual Pakkred School Logo URL -->
+                <img src="https://cdn.discordapp.com/attachments/1069939536567734313/1464593078374498417/images__3_-removebg-preview.png?ex=69760818&is=6974b698&hm=3acd9a41572539e3049113ce182ca2b33f45c860c215bd39faa75f54896d5003&"
+                    alt="โรงเรียนปากเกร็ด"
+                    class="w-12 h-12 object-contain rounded-full shadow-sm border border-gray-100 dark:border-slate-700">
+                <div class="flex flex-col justify-center">
+                    <span
+                        class="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-0.5">โรงเรียนปากเกร็ด</span>
+                    <h1 class="font-bold text-base text-blue-900 dark:text-blue-400 leading-tight">
+                        ระบบจัดการ<br>ผลงานนักเรียน</h1>
+                </div>
+            </div>
+
+            <!-- Sidebar Nav -->
+            <nav class="p-4 space-y-1 overflow-y-auto flex-1">
+                <button onclick="switchView('dashboard')" id="sidebar-dashboard"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
+                    <i data-lucide="trophy"
+                        class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+                    ผลงานทั้งหมด
+                </button>
+                <button onclick="switchView('form')" id="sidebar-form"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
+                    <i data-lucide="plus-circle"
+                        class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+                    เพิ่มข้อมูลใหม่
+                </button>
+                <button onclick="switchView('subject-summary')" id="sidebar-subject"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
+                    <i data-lucide="pie-chart"
+                        class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+                    สรุปตามกลุ่มสาระฯ
+                </button>
+                <button onclick="switchView('pending-rewards')" id="sidebar-pending"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
+                    <i data-lucide="clock"
+                        class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+                    รางวัลรอรับ (experiment)
+                </button>
+
+                <!-- Desktop Subject Filters (Injected here when view is active) -->
+                <div id="sidebar-filters"
+                    class="hidden mt-6 pt-6 border-t border-gray-100 dark:border-slate-800 animate-in fade-in slide-in-from-left-4">
+                    <p class="px-3 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+                        กรองตามกลุ่มสาระ</p>
+                    <div id="sidebar-filter-list" class="space-y-1">
+                        <!-- Filters will be rendered here -->
+                    </div>
+                </div>
+            </nav>
+
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden relative">
+            <!-- Mobile Header (Visible < lg) -->
+            <header
+                class="lg:hidden h-16 bg-white/95 backdrop-blur-sm border-b border-gray-200 dark:bg-slate-900/95 dark:border-slate-800 shrink-0 z-20 flex items-center justify-between px-4 sticky top-0 transition-colors duration-300">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleDrawer()"
+                        class="p-2 -ml-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <!-- TODO: Replace src with actual Pakkred School Logo URL -->
+                        <img src="https://cdn.discordapp.com/attachments/1069939536567734313/1464593078374498417/images__3_-removebg-preview.png?ex=69760818&is=6974b698&hm=3acd9a41572539e3049113ce182ca2b33f45c860c215bd39faa75f54896d5003&"
+                            alt="PK Logo"
+                            class="w-8 h-8 object-contain rounded-full border border-gray-100 dark:border-slate-700">
+                        <span class="font-bold text-gray-800 dark:text-white text-sm">ระบบจัดการผลงานนักเรียน</span>
+                    </div>
+                </div>
+                <button onclick="toggleTheme()"
+                    class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300 transition">
+                    <i data-lucide="moon" class="w-5 h-5 theme-toggle-icon"></i>
+                </button>
+            </header>
+
+            <!-- Desktop Header (Top Bar) -->
+            <header
+                class="hidden lg:flex h-16 bg-white border-b border-gray-200 dark:bg-slate-900 dark:border-slate-800 items-center justify-between px-8 transition-colors duration-300">
+                <h2 class="font-bold text-lg text-gray-800 dark:text-white">ภาพรวมข้อมูล</h2>
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleTheme()"
+                        class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300 transition">
+                        <i data-lucide="moon" class="w-5 h-5 theme-toggle-icon"></i>
+                    </button>
+                    <!-- Login/User Section Placeholder -->
+                    <div id="auth-section"></div>
+                </div>
+            </header>
+
+            <!-- Scrollable Page Content -->
+            <div id="main-scroll-container"
+                class="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth bg-gray-50 dark:bg-slate-950 transition-colors duration-300">
+                <div class="w-full max-w-[1200px] mx-auto pb-24 space-y-6">
+
+                    <!-- Sticky Header & Navigation Content -->
+
+
+                    <!-- VIEW 1: DASHBOARD (Achievement Gallery) -->
+                    <div id="view-dashboard" class="flex-grow p-4 space-y-4 fade-in">
+
+                        <!-- Search & Filter -->
+                        <div class="flex flex-col md:flex-row gap-3">
+                            <div class="relative flex-grow">
+                                <i data-lucide="search"
+                                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500"></i>
+                                <input type="text" id="search-input" oninput="handleSearch()"
+                                    placeholder="ค้นหาชื่อนักเรียน, รายการ..."
+                                    class="w-full pl-9 pr-4 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-500 transition dark:text-white dark:placeholder-gray-500">
+                            </div>
+                            <!-- Sort Dropdown -->
+                            <div class="relative w-full md:w-48">
+                                <select id="sort-select" onchange="handleSort()"
+                                    class="w-full appearance-none pl-3 pr-8 py-2.5 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-600 dark:text-gray-300 outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-500 transition cursor-pointer">
+                                    <option value="latest">ล่าสุด</option>
+                                    <option value="rank">รางวัล</option>
+                                    <option value="level">ระดับ</option>
+                                </select>
+                                <i data-lucide="chevron-down"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none"></i>
+                            </div>
+                        </div>
+
+                        <!-- Stats Summary -->
+                        <div id="stats-container" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                            <!-- Stats will be updated by JS -->
+                            <div
+                                class="p-5 bg-gradient-to-br from-blue-50 to-white dark:from-slate-800 dark:to-slate-900 border border-blue-100/50 dark:border-slate-700/50 rounded-2xl shadow-lg shadow-blue-100/30 dark:shadow-none hover-lift relative overflow-hidden group">
+                                <div
+                                    class="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="trophy" class="w-16 h-16 text-blue-600 dark:text-blue-500"></i>
+                                </div>
+                                <p
+                                    class="text-xs font-bold text-blue-500 dark:text-blue-400 uppercase tracking-wider mb-2">
+                                    ผลงานทั้งหมด
+                                </p>
+                                <p class="text-3xl font-extrabold text-blue-900 dark:text-white leading-none"
+                                    id="stat-total">-</p>
+                            </div>
+                            <div
+                                class="p-5 bg-gradient-to-br from-green-50 to-white dark:from-slate-800 dark:to-slate-900 border border-green-100/50 dark:border-slate-700/50 rounded-2xl shadow-lg shadow-green-100/30 dark:shadow-none hover-lift relative overflow-hidden group">
+                                <div
+                                    class="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="award" class="w-16 h-16 text-green-600 dark:text-green-500"></i>
+                                </div>
+                                <p class="text-xs font-bold text-green-500 uppercase tracking-wider mb-2">
+                                    ระดับชาติขึ้นไป</p>
+                                <p class="text-3xl font-extrabold text-green-900 dark:text-white leading-none"
+                                    id="stat-national">-</p>
+                            </div>
+
+                            <!-- Teacher Stats Button -->
+                            <div onclick="showTeacherStats()"
+                                class="p-5 bg-gradient-to-br from-purple-50 to-white dark:from-slate-800 dark:to-slate-900 border border-purple-100/50 dark:border-slate-700/50 rounded-2xl shadow-lg shadow-purple-100/30 dark:shadow-none hover-lift relative overflow-hidden group cursor-pointer transition-all active:scale-95">
+                                <div
+                                    class="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="users" class="w-16 h-16 text-purple-600 dark:text-purple-500"></i>
+                                </div>
+                                <p class="text-xs font-bold text-purple-500 uppercase tracking-wider mb-2">
+                                    อันดับผลงานของครูผู้ฝึกซ้อม</p>
+                                <div class="flex items-center gap-2">
+                                    <p class="text-sm font-bold text-purple-900 dark:text-white leading-none">ดูข้อมูล
+                                    </p>
+                                    <i data-lucide="arrow-right" class="w-4 h-4 text-purple-600"></i>
+                                </div>
+                            </div>
+
+                            <!-- Dept Stats Button -->
+                            <div onclick="showDeptStats()"
+                                class="p-5 bg-gradient-to-br from-orange-50 to-white dark:from-slate-800 dark:to-slate-900 border border-orange-100/50 dark:border-slate-700/50 rounded-2xl shadow-lg shadow-orange-100/30 dark:shadow-none hover-lift relative overflow-hidden group cursor-pointer transition-all active:scale-95">
+                                <div
+                                    class="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <i data-lucide="building-2"
+                                        class="w-16 h-16 text-orange-600 dark:text-orange-500"></i>
+                                </div>
+                                <p class="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">
+                                    อันดับผลงานของแต่ละกลุ่มสาระ</p>
+                                <div class="flex items-center gap-2">
+                                    <p class="text-sm font-bold text-orange-900 dark:text-white leading-none">ดูข้อมูล
+                                    </p>
+                                    <i data-lucide="arrow-right" class="w-4 h-4 text-orange-600"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h2 class="text-lg font-bold text-gray-700 mt-4 mb-3 px-1">รายการผลงาน</h2>
+
+                        <!-- Award List -->
+                        <div id="award-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]">
+                            <!-- Loading State -->
+                            <div
+                                class="col-span-full flex flex-col items-center justify-center py-20 text-gray-400 animate-pulse">
+                                <i data-lucide="loader-2" class="w-8 h-8 mb-2 animate-spin"></i>
+                                <span class="text-sm">กำลังโหลดข้อมูล...</span>
+                            </div>
+                        </div>
+
+                        <!-- Pagination Controls -->
+                        <div id="pagination-controls" class="flex justify-between items-center pt-4 pb-20 hidden">
+                            <button onclick="changePage(-1)" id="btn-page-prev"
+                                class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                ก่อนหน้า
+                            </button>
+                            <span id="page-info" class="text-xs text-gray-400">หน้า 1 / 1</span>
+                            <button onclick="changePage(1)" id="btn-page-next"
+                                class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                                ถัดไป
+                            </button>
+                        </div>
+                    </div>
+
+
+                    <!-- VIEW 2: FORM WIZARD -->
+                    <div id="view-form" class="hidden flex-grow p-4 flex flex-col pb-24 fade-in items-center">
+                        <!-- Wizard Progress Indicator -->
+                        <div id="wizard-progress" class="w-full max-w-3xl px-4 md:px-0 mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-blue-600" id="step-indicator">ขั้นตอนที่
+                                    1/4</span>
+                                <span class="text-xs text-gray-400">แบบฟอร์มบันทึก</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                <div id="progress-bar"
+                                    class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                                    style="width: 25%"></div>
+                            </div>
+                        </div>
+
+                        <form id="wizard-form" onsubmit="event.preventDefault();"
+                            class="flex-grow w-full max-w-3xl mx-auto md:bg-white md:p-8 md:rounded-2xl md:border md:border-gray-100 md:shadow-sm">
+
+                            <!-- STEP 1: Competition Info -->
+                            <div id="step-1" class="step-content">
+                                <h2 class="text-xl font-bold mb-1">ข้อมูลการแข่งขัน</h2>
+                                <p class="text-gray-500 mb-6 text-sm">รายละเอียดกิจกรรมและรางวัลที่ได้รับ</p>
+
+                                <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                                    <!-- Competition Name -->
+                                    <div class="xl:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">ชื่อรายการแข่งขัน
+                                            <span class="text-red-500">*</span></label>
+                                        <input type="text" id="comp-name"
+                                            class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition"
+                                            placeholder="เช่น ศิลปหัตถกรรมนักเรียน">
+                                    </div>
+
+                                    <!-- Organization (Dept/Group) -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">ส่งรางวัลในนาม
+                                            <span class="text-red-500">*</span></label>
+                                        <select id="comp-dept" onchange="toggleOtherDept()"
+                                            class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition cursor-pointer">
+                                            <option value="">-- เลือกกลุ่มสาระ/งาน --</option>
+                                            <option>กลุ่มสาระการเรียนรู้คณิตศาสตร์</option>
+                                            <option>กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี</option>
+                                            <option>กลุ่มสาระการเรียนรู้ภาษาไทย</option>
+                                            <option>กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ</option>
+                                            <option>กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนาและวัฒนธรรม</option>
+                                            <option>กลุ่มสาระการเรียนรู้สุขศึกษา พลศึกษา</option>
+                                            <option>กลุ่มสาระการเรียนรู้ศิลปะ</option>
+                                            <option>กลุ่มสาระการเรียนรู้การงานอาชีพ</option>
+                                            <option>งานแนะแนว</option>
+                                            <option>งานห้องเรียนพิเศษ smte</option>
+                                            <option>งานเทคโนโลยี</option>
+                                            <option>กิจกรรมพัฒนาผู้เรียน (ลูกเสือ)</option>
+                                            <option>งานสภานักเรียน</option>
+                                            <option>งานห้องสมุด</option>
+                                            <option>งานห้องเรียนสีเขียว</option>
+                                            <option>งาน to be number one</option>
+                                            <option value="other">อื่นๆ (โปรดระบุ)</option>
+                                        </select>
+                                        <input type="text" id="comp-dept-other"
+                                            class="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-100 outline-none hidden fade-in"
+                                            placeholder="ระบุชื่อกลุ่มสาระ/งาน...">
+                                    </div>
+
+                                    <!-- Organization (External) -->
+                                    <div>
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 mb-1">หน่วยงานที่จัดแข่งขัน</label>
+                                        <input type="text" id="comp-org"
+                                            class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition"
+                                            placeholder="เช่น สพฐ., มหาวิทยาลัย...">
+                                    </div>
+
+                                    <!-- Date -->
+                                    <div class="xl:col-span-1">
+                                        <label
+                                            class="block text-sm font-medium text-gray-700 mb-1">วันที่ได้รับรางวัล</label>
+                                        <div class="relative">
+                                            <input type="date" id="comp-date"
+                                                class="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none text-gray-600 cursor-pointer">
+                                        </div>
+                                    </div>
+
+                                    <!-- Rank -->
+                                    <div class="xl:col-span-1">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">รางวัลที่ได้รับ
+                                            <span class="text-red-500">*</span></label>
+                                        <select id="comp-rank" onchange="toggleOtherRank()"
+                                            class="w-full px-4 py-3 rounded-xl border border-blue-200 bg-blue-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none text-blue-900 font-semibold cursor-pointer">
+                                            <option value="">-- เลือรางวัล --</option>
+                                            <option value="ชนะเลิศ">ชนะเลิศ</option>
+                                            <option value="รองชนะเลิศอันดับที่ 1">รองชนะเลิศอันดับที่ 1</option>
+                                            <option value="รองชนะเลิศอันดับที่ 2">รองชนะเลิศอันดับที่ 2</option>
+                                            <option value="รองชนะเลิศอันดับที่ 3">รองชนะเลิศอันดับที่ 3</option>
+                                            <option value="เหรียญทอง">เหรียญทอง</option>
+                                            <option value="เหรียญเงิน">เหรียญเงิน</option>
+                                            <option value="เหรียญทองแดง">เหรียญทองแดง</option>
+                                            <option value="ชมเชย">ชมเชย</option>
+                                            <option value="เข้าร่วม">เข้าร่วม</option>
+                                            <option value="other">อื่นๆ (โปรดระบุ)</option>
+                                        </select>
+                                        <input type="text" id="comp-rank-other"
+                                            class="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-100 outline-none hidden fade-in"
+                                            placeholder="ระบุชื่อรางวัล...">
+                                    </div>
+
+                                    <!-- Level (Chips) -->
+                                    <div class="xl:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">ระดับการแข่งขัน
+                                            <span class="text-red-500">*</span></label>
+                                        <div id="level-container" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="level" value="school"
+                                                    class="hidden radio-card">
+                                                <div
+                                                    class="border border-gray-200 rounded-lg p-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                    ระดับโรงเรียน</div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="level" value="area" class="hidden radio-card">
+                                                <div
+                                                    class="border border-gray-200 rounded-lg p-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                    ระดับเขตพื้นที่ฯ</div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="level" value="province"
+                                                    class="hidden radio-card">
+                                                <div
+                                                    class="border border-gray-200 rounded-lg p-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                    ระดับจังหวัด</div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="level" value="region"
+                                                    class="hidden radio-card">
+                                                <div
+                                                    class="border border-gray-200 rounded-lg p-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                    ระดับภาค</div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="level" value="nation"
+                                                    class="hidden radio-card">
+                                                <div
+                                                    class="border border-gray-200 rounded-lg p-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                    ระดับประเทศ</div>
+                                            </label>
+                                            <label class="cursor-pointer">
+                                                <input type="radio" name="level" value="inter"
+                                                    class="hidden radio-card">
+                                                <div
+                                                    class="border border-gray-200 rounded-lg p-3 text-center text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                                                    ระดับนานาชาติ</div>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Evidence File Upload -->
+                                    <div class="xl:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">หลักฐานการแข่งขัน
+                                            <span class="text-gray-400 font-normal">(ไม่เกิน 5MB)</span>
+                                        </label>
+                                        <div id="file-upload-zone"
+                                            class="file-upload-zone rounded-xl p-6 text-center cursor-pointer"
+                                            onclick="document.getElementById('evidence-file').click()"
+                                            ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+                                            ondrop="handleFileDrop(event)">
+                                            <input type="file" id="evidence-file" class="hidden"
+                                                accept="image/*,.pdf,.doc,.docx" onchange="handleFileSelect(event)">
+                                            <div id="file-upload-placeholder">
+                                                <i data-lucide="upload-cloud"
+                                                    class="w-10 h-10 mx-auto text-gray-400 mb-2"></i>
+                                                <p class="text-sm text-gray-600 font-medium">คลิกหรือลากไฟล์มาวางที่นี่
+                                                </p>
+                                                <p class="text-xs text-gray-400 mt-1">รองรับ: รูปภาพ, PDF, Word (สูงสุด
+                                                    5MB)</p>
+                                            </div>
+                                            <div id="file-upload-preview" class="hidden">
+                                                <div class="flex items-center justify-center gap-3">
+                                                    <i data-lucide="file-check" class="w-8 h-8 text-green-500"></i>
+                                                    <div class="text-left">
+                                                        <p id="file-name" class="text-sm font-medium text-gray-800"></p>
+                                                        <p id="file-size" class="text-xs text-gray-500"></p>
+                                                    </div>
+                                                    <button type="button" onclick="clearFile(event)"
+                                                        class="ml-2 p-1.5 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition">
+                                                        <i data-lucide="x" class="w-4 h-4"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p id="file-error" class="hidden text-xs text-red-500 mt-2"></p>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <!-- STEP 2: Students -->
+                            <div id="step-2" class="step-content hidden">
+                                <h2 class="text-xl font-bold mb-1">รายชื่อนักเรียน</h2>
+                                <p class="text-gray-500 mb-6 text-sm">เพิ่มนักเรียนที่เข้าร่วมการแข่งขัน</p>
+
+                                <div id="student-list" class="space-y-3 mb-6 min-h-[100px]">
+                                    <div
+                                        class="text-center py-8 bg-gray-50 rounded-xl border border-gray-200 border-dashed">
+                                        <p class="text-gray-400 text-sm">ยังไม่มีรายชื่อนักเรียน</p>
+                                    </div>
+                                </div>
+
+                                <button onclick="openStudentModal(-1)"
+                                    class="w-full py-3 rounded-xl border-2 border-dashed border-blue-400 text-blue-600 font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-2">
+                                    <i data-lucide="user-plus" class="w-5 h-5"></i>
+                                    เพิ่มนักเรียน
+                                </button>
+                            </div>
+
+                            <!-- STEP 3: Teachers -->
+                            <div id="step-3" class="step-content hidden">
+                                <h2 class="text-xl font-bold mb-1">ครูผู้ฝึกซ้อม</h2>
+                                <p class="text-gray-500 mb-6 text-sm">เพิ่มรายชื่อครูที่ปรึกษา</p>
+
+                                <div id="teacher-list" class="space-y-3 mb-6 min-h-[100px]">
+                                    <div
+                                        class="text-center py-8 bg-gray-50 rounded-xl border border-gray-200 border-dashed">
+                                        <p class="text-gray-400 text-sm">ยังไม่มีรายชื่อครู</p>
+                                    </div>
+                                </div>
+
+                                <button onclick="openTeacherModal(-1)"
+                                    class="w-full py-3 rounded-xl border-2 border-dashed border-green-400 text-green-600 font-semibold hover:bg-green-50 transition flex items-center justify-center gap-2">
+                                    <i data-lucide="user-plus" class="w-5 h-5"></i>
+                                    เพิ่มรายชื่อครู
+                                </button>
+                            </div>
+
+                            <!-- STEP 4: Summary -->
+                            <div id="step-4" class="step-content hidden">
+                                <h2 class="text-xl font-bold mb-1">ตรวจสอบข้อมูล</h2>
+                                <p class="text-gray-500 mb-6 text-sm">กรุณาตรวจสอบความถูกต้องก่อนบันทึก</p>
+
+                                <div class="space-y-6">
+                                    <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
+                                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                                            <i data-lucide="trophy" class="w-5 h-5 text-blue-600"></i>
+                                            ข้อมูลรางวัล
+                                        </h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <p class="text-gray-400 text-xs mb-1">รายการแข่งขัน</p>
+                                                <p class="font-semibold text-gray-800" id="summary-comp-name">-</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-gray-400 text-xs mb-1">ระดับ</p>
+                                                <p class="font-semibold text-gray-800" id="summary-comp-level">-</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-gray-400 text-xs mb-1">รางวัลที่ได้รับ</p>
+                                                <p class="font-semibold text-blue-600" id="summary-comp-rank">-</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-gray-400 text-xs mb-1">วันที่</p>
+                                                <p class="font-semibold text-gray-800" id="summary-comp-date">-</p>
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <p class="text-gray-400 text-xs mb-1">กลุ่มสาระฯ/งาน</p>
+                                                <p class="font-semibold text-gray-800" id="summary-comp-dept">-</p>
+                                            </div>
+                                            <div class="md:col-span-2">
+                                                <p class="text-gray-400 text-xs mb-1">หน่วยงานจัดแข่ง</p>
+                                                <p class="font-semibold text-gray-800" id="summary-comp-org">-</p>
+                                            </div>
+                                            <div class="md:col-span-2 hidden" id="summary-evidence-container">
+                                                <p class="text-gray-400 text-xs mb-1">ไฟล์หลักฐาน</p>
+                                                <div
+                                                    class="flex items-center gap-2 text-blue-600 bg-white p-2 rounded-lg border border-blue-100 inline-flex">
+                                                    <i data-lucide="file-check" class="w-4 h-4"></i>
+                                                    <span class="font-medium truncate max-w-xs"
+                                                        id="summary-evidence-text"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-gray-50/50 p-5 rounded-xl border border-gray-100">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                                                    <i data-lucide="users" class="w-4 h-4 text-gray-600"></i>
+                                                    นักเรียน
+                                                </h3>
+                                                <span
+                                                    class="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full"
+                                                    id="summary-student-count">0</span>
+                                            </div>
+                                            <div class="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar text-sm"
+                                                id="summary-student-list">
+                                                <!-- List -->
+                                            </div>
+                                        </div>
+
+                                        <div class="bg-gray-50/50 p-5 rounded-xl border border-gray-100">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                                                    <i data-lucide="user-check" class="w-4 h-4 text-gray-600"></i>
+                                                    ครูผู้ฝึกซ้อม
+                                                </h3>
+                                                <span
+                                                    class="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full"
+                                                    id="summary-teacher-count">0</span>
+                                            </div>
+                                            <div class="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar text-sm"
+                                                id="summary-teacher-list">
+                                                <!-- List -->
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="flex justify-between mt-8 pt-6 border-t border-gray-100">
+                                <button onclick="changeStep(-1)" id="btn-prev"
+                                    class="hidden px-6 py-2.5 rounded-xl text-gray-600 hover:bg-gray-100 font-medium transition">
+                                    ย้อนกลับ
+                                </button>
+                                <div class="ml-auto">
+                                    <button onclick="changeStep(1)" id="btn-next"
+                                        class="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
+                                        ถัดไป
+                                    </button>
+                                    <button onclick="submitForm()" id="btn-submit"
+                                        class="hidden px-8 py-2.5 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200">
+                                        ยืนยันการบันทึก
+                                    </button>
+                                </div>
+                            </div>
+
+                        </form>
+                    </div>
+
+                    <!-- VIEW 3: SUBJECT SUMMARY (New Feature) -->
+                    <div id="view-subject-summary"
+                        class="hidden flex-grow flex flex-col h-full bg-white dark:bg-slate-900 absolute inset-0 z-40 lg:relative lg:bg-transparent overflow-hidden">
+                        <!-- Header (Mobile Only) -->
+                        <div class="lg:hidden p-4 bg-white border-b border-gray-100 flex items-center gap-3">
+                            <button onclick="switchView('dashboard')"
+                                class="p-2 -ml-2 text-gray-400 hover:text-gray-600">
+                                <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                            </button>
+                            <h2 class="font-bold text-lg text-gray-800">สรุปตามกลุ่มสาระฯ</h2>
+                        </div>
+
+                        <div class="flex flex-col h-full lg:h-auto overflow-hidden">
+                            <!-- Filters Area -->
+                            <div
+                                class="p-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 lg:bg-transparent lg:border-0 lg:p-0 lg:mb-6">
+                                <input type="text" id="subject-search-input" oninput="handleSubjectSearch()"
+                                    placeholder="ค้นหาชื่อรายการ..."
+                                    class="w-full px-4 py-3 bg-gray-50 dark:bg-slate-800 border-0 rounded-xl text-sm mb-3 lg:bg-white lg:border lg:border-gray-200 focus:ring-2 focus:ring-blue-100 outline-none">
+
+                                <!-- Horizontal Scrollable Filters (Mobile) -->
+                                <div id="subject-scroll-container" class="lg:hidden pb-1 overflow-x-auto no-scrollbar">
+                                    <!-- Populated by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Content Area -->
+                            <div class="flex-1 overflow-y-auto p-4 lg:p-0 lg:overflow-visible">
+                                <!-- Stats Cards -->
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                                    <div class="bg-blue-50/50 p-3 rounded-xl border border-blue-100 text-center">
+                                        <p class="text-xs text-blue-500 font-bold uppercase">ทั้งหมด</p>
+                                        <p class="text-2xl font-extrabold text-blue-700" id="stat-summary-total">0</p>
+                                    </div>
+                                    <div class="bg-pink-50/50 p-3 rounded-xl border border-pink-100 text-center">
+                                        <p class="text-xs text-pink-500 font-bold uppercase">นานาชาติ</p>
+                                        <p class="text-2xl font-extrabold text-pink-700" id="stat-inter">0</p>
+                                    </div>
+                                    <div class="bg-purple-50/50 p-3 rounded-xl border border-purple-100 text-center">
+                                        <p class="text-xs text-purple-500 font-bold uppercase">ระดับชาติ</p>
+                                        <p class="text-2xl font-extrabold text-purple-700" id="stat-nation">0</p>
+                                    </div>
+                                    <div class="bg-orange-50/50 p-3 rounded-xl border border-orange-100 text-center">
+                                        <p class="text-xs text-orange-500 font-bold uppercase">ระดับภาค</p>
+                                        <p class="text-2xl font-extrabold text-orange-700" id="stat-region">0</p>
+                                    </div>
+                                </div>
+
+                                <!-- List -->
+                                <h3 class="font-bold text-gray-700 mb-3 px-1">รายชื่อผลงาน</h3>
+                                <div id="subject-result-list" class="space-y-3 pb-24">
+                                    <!-- Dynamic Content -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- VIEW 4: PENDING REWARDS (Experiment) -->
+                    <div id="view-pending-rewards"
+                        class="hidden flex-grow flex flex-col h-full absolute inset-0 z-40 bg-white lg:relative lg:bg-transparent fade-in overflow-hidden">
+                        <!-- Header -->
+                        <div
+                            class="p-4 border-b border-gray-100 bg-white dark:bg-slate-900 lg:bg-transparent lg:border-0 lg:p-0 lg:mb-4 flex items-center justify-between shrink-0">
+                            <div class="flex items-center gap-3 lg:hidden">
+                                <button onclick="switchView('dashboard')"
+                                    class="p-2 -ml-2 text-gray-400 hover:text-gray-600 print:hidden">
+                                    <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                                </button>
+                                <h2 class="font-bold text-lg text-gray-800">รางวัลรอรับ</h2>
+                            </div>
+                            <div class="hidden lg:block">
+                                <h2 class="font-bold text-lg text-gray-800">รายการรางวัลที่รอรับ</h2>
+                                <p class="text-xs text-gray-400">รายการที่ได้รับรางวัลแต่ยังไม่ได้ระบุว่ารับแล้ว</p>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleSelectionMode()" id="btn-toggle-select"
+                                    class="flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-sm font-bold transition print:hidden">
+                                    <i data-lucide="check-square" class="w-4 h-4"></i>
+                                    <span class="hidden sm:inline">เลือกรายการ</span>
+                                </button>
+                                <button onclick="savePendingRewardsPDF()"
+                                    class="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-bold transition print:hidden">
+                                    <i data-lucide="file-down" class="w-4 h-4"></i>
+                                    <span class="hidden sm:inline">Save PDF</span>
+                                </button>
+                                <button onclick="printPendingRewards()"
+                                    class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-bold transition print:hidden">
+                                    <i data-lucide="printer" class="w-4 h-4"></i>
+                                    <span class="hidden sm:inline">พิมพ์รายงาน</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Search -->
+                        <div
+                            class="p-4 bg-gray-50 border-b border-gray-100 dark:bg-slate-800 dark:border-slate-700 lg:rounded-xl lg:border lg:mb-4 shrink-0 print:hidden">
+                            <div class="relative">
+                                <i data-lucide="search"
+                                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                                <input type="text" id="pending-search-input" oninput="renderPendingRewards()"
+                                    placeholder="ค้นหารายการ, ชื่อนักเรียน..."
+                                    class="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-100 transition">
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div
+                            class="flex-1 overflow-auto bg-white lg:rounded-xl lg:border lg:border-gray-200 lg:shadow-sm">
+                            <table id="pending-rewards-table" class="w-full text-left border-collapse">
+                                <thead class="bg-gray-50 text-gray-500 text-xs uppercase sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th
+                                            class="px-4 py-3 font-semibold w-12 hidden select-col transition-all duration-300">
+                                            <div class="w-4 h-4 rounded border border-gray-300"></div>
+                                        </th>
+                                        <th class="px-4 py-3 font-semibold w-24">รางวัล</th>
+                                        <th class="px-4 py-3 font-semibold">รายการแข่งขัน</th>
+                                        <th class="px-4 py-3 font-semibold w-24">ระดับ</th>
+                                        <th class="px-4 py-3 font-semibold w-32">หน่วยงาน</th>
+                                        <th class="px-4 py-3 font-semibold">นักเรียน</th>
+                                    </tr>
+                                </thead>
+                                <!-- Tbody will be generated by JS -->
+                            </table>
+                            <div id="no-pending-data"
+                                class="hidden flex flex-col items-center justify-center py-20 text-gray-400">
+                                <i data-lucide="check-circle-2" class="w-12 h-12 mb-3 text-green-100"></i>
+                                <p>ไม่พบรายการที่รอรับรางวัล</p>
+                            </div>
+                        </div>
+
+                        <!-- Selection Action Bar (Sticky Bottom) -->
+                        <div id="selection-action-bar"
+                            class="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] border-t border-gray-100 z-50 transform translate-y-full transition-transform duration-300 flex items-center justify-between lg:w-[calc(100%-16rem)] lg:left-64 lg:ml-[2px] print:hidden">
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-medium text-gray-600">เลือกแล้ว <span id="selected-count"
+                                        class="text-blue-600 font-bold">0</span> รายการ</span>
+                                <button onclick="selectAllVisible()"
+                                    class="text-xs text-blue-500 underline hover:text-blue-700">เลือกทั้งหมด</button>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <button onclick="executeBulkAction('reject')"
+                                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-bold transition flex items-center gap-2">
+                                    <i data-lucide="x-circle" class="w-4 h-4"></i>
+                                    <span class="hidden sm:inline">ไม่รับ/ซ่อน</span>
+                                </button>
+                                <button onclick="executeBulkAction('receive')"
+                                    class="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition shadow-lg shadow-green-200 flex items-center gap-2">
+                                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                                    <span>ยืนยันรับรางวัล</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"
+            onclick="closeModal('detail-modal')"></div>
+        <div
+            class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 flex flex-col max-h-[90vh] transform transition-transform duration-300 translate-y-full">
+            <!-- Modal Header -->
+            <div
+                class="flex items-start justify-between p-6 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-800/50 rounded-t-2xl">
+                <div>
+                    <div class="flex items-center gap-3 mb-2">
+                        <span id="detail-rank-badge"
+                            class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">รางวัล</span>
+                        <span id="detail-level-badge"
+                            class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-600">ระดับ</span>
+                    </div>
+                    <h3 id="detail-title" class="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                        ชื่อรายการแข่งขัน</h3>
+                    <p id="detail-subtitle" class="text-sm text-gray-500 dark:text-gray-400 mt-1">หน่วยงาน/กลุ่มสาระ</p>
+                </div>
+                <button onclick="closeModal('detail-modal')"
+                    class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-400 hover:text-gray-600 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-6">
+                <!-- Date & Evidence -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <i data-lucide="calendar" class="w-4 h-4"></i>
+                        <span id="detail-date">-</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div id="evidence-actions" class="hidden gap-2">
+                            <a id="detail-link-btn" href="#" target="_blank"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 transition">
+                                <i data-lucide="external-link" class="w-4 h-4"></i>
+                                ดูหลักฐาน
+                            </a>
+                            <button id="detail-preview-btn" onclick="togglePreview()"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-100 transition hidden">
+                                <i data-lucide="eye" class="w-4 h-4"></i>
+                                ตัวอย่าง
+                            </button>
+                        </div>
+                        <span id="detail-no-link" class="text-sm text-gray-400 italic hidden">ไม่มีไฟล์แนบ</span>
+                    </div>
+                </div>
+
+                <!-- Preview Container -->
+                <div id="preview-container"
+                    class="hidden border rounded-xl overflow-hidden bg-gray-100 h-64 md:h-80 relative">
+                    <iframe id="preview-frame" class="w-full h-full" allow="autoplay"></iframe>
+                </div>
+
+                <!-- Participants Section -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Students -->
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <h4 class="font-bold text-gray-800 dark:text-white">นักเรียน</h4>
+                            <span id="detail-std-count"
+                                class="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="detail-std-list" class="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                            <!-- Dynamic List -->
+                        </div>
+                    </div>
+
+                    <!-- Teachers -->
+                    <div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <h4 class="font-bold text-gray-800 dark:text-white">ครูผู้ฝึกซ้อม</h4>
+                            <span id="detail-tch-count"
+                                class="bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-300 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                        </div>
+                        <div id="detail-tch-list" class="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                            <!-- Dynamic List -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Modal Footer -->
+            <div
+                class="p-4 border-t border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-800/30 flex justify-end rounded-b-2xl">
+                <button onclick="closeModal('detail-modal')"
+                    class="px-6 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition shadow-sm">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Modal (Add/Edit) -->
+    <div id="student-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+            onclick="closeModal('student-modal')"></div>
+        <div
+            class="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 transform transition-transform duration-300 translate-y-full flex flex-col max-h-[90vh]">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-gray-800">เพิ่มข้อมูลนักเรียน</h3>
+                <button onclick="closeModal('student-modal')" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 overflow-y-auto">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">คำนำหน้า</label>
+                    <select id="std-title"
+                        class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none">
+                        <option>ด.ช.</option>
+                        <option>ด.ญ.</option>
+                        <option>นาย</option>
+                        <option>นางสาว</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">ชื่อ</label>
+                        <input type="text" id="std-firstname"
+                            class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none"
+                            placeholder="ชื่อจริง">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">นามสกุล</label>
+                        <input type="text" id="std-lastname"
+                            class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none"
+                            placeholder="นามสกุล">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">ระดับชั้น</label>
+                        <select id="std-grade" onchange=""
+                            class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none">
+                            <option>ม.1</option>
+                            <option>ม.2</option>
+                            <option>ม.3</option>
+                            <option>ม.4</option>
+                            <option>ม.5</option>
+                            <option>ม.6</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">ห้อง</label>
+                        <select id="std-room"
+                            class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 p-3 rounded-lg flex items-start gap-2">
+                    <i data-lucide="info" class="w-4 h-4 text-blue-500 mt-0.5 shrink-0"></i>
+                    <p class="text-xs text-blue-600">กรณีเป็นนักเรียนที่จบการศึกษาแล้ว
+                        ให้เลือกระดับชั้นตามปีการศึกษาที่ได้รับรางวัล</p>
+                </div>
+
+                <button onclick="saveStudent()"
+                    class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold mt-2 hover:bg-blue-700 transition">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teacher Modal (Add/Edit) -->
+    <div id="teacher-modal" class="fixed inset-0 z-[60] hidden items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+            onclick="closeModal('teacher-modal')"></div>
+        <div
+            class="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 transform transition-transform duration-300 translate-y-full flex flex-col">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-lg text-gray-800">เพิ่มข้อมูลครู</h3>
+                <button onclick="closeModal('teacher-modal')" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 mb-1">คำนำหน้า</label>
+                    <select id="tch-title"
+                        class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none">
+                        <option>นาย</option>
+                        <option>นาง</option>
+                        <option>นางสาว</option>
+                        <option>ว่าที่ร้อยตรี</option>
+                        <option>ดร.</option>
+                        <option>อื่น ๆ</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">ชื่อ</label>
+                        <input type="text" id="tch-firstname"
+                            class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none"
+                            placeholder="ชื่อ">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1">นามสกุล</label>
+                        <input type="text" id="tch-lastname"
+                            class="w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none"
+                            placeholder="นามสกุล">
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <button onclick="saveTeacher()"
+                        class="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-100">ยืนยันข้อมูล</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="py-6 w-full text-center text-sm text-gray-400 flex items-center justify-center gap-2 mt-auto">
+        <span>Made with</span>
+        <i data-lucide="heart" class="w-4 h-4 text-red-400 fill-current"></i>
+        <span>by namo</span>
+        <a href="https://github.com/namo5758" target="_blank" rel="noopener noreferrer"
+            class="ml-2 hover:text-gray-600 transition-colors">
+            <i data-lucide="github" class="w-4 h-4"></i>
+        </a>
+    </footer>
+    <!-- Loading Overlay -->
+    <div id="loading"
+        class="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center invisible transition-all duration-300">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center">
+            <div class="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+            <p class="text-gray-800 font-bold text-lg">กำลังบันทึกข้อมูล...</p>
+            <p class="text-gray-500 text-sm">กรุณารอสักครู่</p>
+        </div>
+    </div>
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"
+            onclick="closeModal('login-modal')"></div>
+        <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-sm p-6 transform transition-all scale-100 opacity-100">
+            <div class="text-center mb-6">
+                <div
+                    class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <i data-lucide="lock" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white">เข้าสู่ระบบ</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">กรุณาเข้าสู่ระบบเพื่อจัดการข้อมูล</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label
+                        class="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">ชื่อผู้ใช้งาน</label>
+                    <input type="text" id="login-username"
+                        class="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition dark:text-white">
+                </div>
+                <div>
+                    <label
+                        class="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">รหัสผ่าน</label>
+                    <input type="password" id="login-password"
+                        class="w-full px-4 py-2.5 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition dark:text-white">
+                </div>
+                <button onclick="doLogin()" id="btn-login-submit"
+                    class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition flex items-center justify-center gap-2">
+                    <span>เข้าสู่ระบบ</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
