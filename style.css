@@ -233,3 +233,11 @@ body {
         display: none !important;
     }
 }
+
+/* Fix for Select Overflow */
+#comp-dept-group,
+#comp-dept-work {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+}

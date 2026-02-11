@@ -2,7 +2,7 @@
 lucide.createIcons();
 //old = https://script.google.com/macros/s/AKfycbziZFKakpzfrVgu-V6YwwfIk--TIaHlLc6sIsZD4s84e1i1Y6VxByF80RrLx5ZGCPtnhg/exec
 // --- CONSTANTS ---
-const API_URL = "https://script.google.com/macros/s/AKfycbwD59z8jBsYjPb0_rwRhyosBTXblyRb6lT2LnXcAiiucSgIJtVBrMn6Mh1ZIU8VpL4E-w/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxwozY67uTbUjxaAqkm_PTLrODAYspDrdEPJAOMIa82177CsrWC8WSURIOYfcxrHDjeqw/exec";
 const ITEMS_PER_PAGE = 50;
 
 // --- APP STATE ---
@@ -151,6 +151,9 @@ function logout() {
 
 function updateAuthUI() {
     const authSection = document.getElementById('auth-section');
+    const mobileAuthSection = document.getElementById('mobile-auth-section');
+    const drawerUserInfo = document.getElementById('drawer-user-info');
+
     if (authSection) {
         if (appState.isLoggedIn) {
             authSection.innerHTML = `
@@ -160,6 +163,81 @@ function updateAuthUI() {
             authSection.innerHTML = `
                 <button onclick="openModal('login-modal')" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 transition whitespace-nowrap">เข้าสู่ระบบ</button>
             `;
+        }
+    }
+
+    // Mobile Header Auth Button
+    if (mobileAuthSection) {
+        if (appState.isLoggedIn) {
+            mobileAuthSection.innerHTML = `
+                <button onclick="logout()"
+                    class="p-2 rounded-full hover:bg-red-50 text-red-500 transition" title="ออกจากระบบ">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+            `;
+        } else {
+            mobileAuthSection.innerHTML = `
+                <button onclick="openModal('login-modal')"
+                    class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300 transition" title="เข้าสู่ระบบ">
+                    <i data-lucide="log-in" class="w-5 h-5"></i>
+                </button>
+            `;
+        }
+    }
+
+    // Drawer User Info
+    if (drawerUserInfo) {
+        if (appState.isLoggedIn && appState.user) {
+            const name = appState.user.name || 'ผู้ใช้';
+            const role = appState.user.role || '-';
+            const initial = name.charAt(0).toUpperCase();
+
+            // Role display mapping
+            let roleLabel = role;
+            if (role === 'Admin') roleLabel = 'ผู้ดูแลระบบ';
+            else if (role === 'Teacher') roleLabel = 'ครู';
+            else if (role === 'Student') roleLabel = 'นักเรียน';
+
+            drawerUserInfo.classList.remove('hidden');
+            document.getElementById('drawer-user-avatar').textContent = initial;
+            document.getElementById('drawer-user-name').textContent = name;
+            document.getElementById('drawer-user-role').textContent = roleLabel;
+        } else {
+            drawerUserInfo.classList.add('hidden');
+        }
+    }
+
+    // Desktop User Info
+    const desktopUserInfo = document.getElementById('desktop-user-info');
+    if (desktopUserInfo) {
+        if (appState.isLoggedIn && appState.user) {
+            const name = appState.user.name || 'ผู้ใช้';
+            const role = appState.user.role || '-';
+            const initial = name.charAt(0).toUpperCase();
+
+            let roleLabel = role;
+            if (role === 'Admin') roleLabel = 'ผู้ดูแลระบบ';
+            else if (role === 'Teacher') roleLabel = 'ครู';
+            else if (role === 'Student') roleLabel = 'นักเรียน';
+
+            desktopUserInfo.innerHTML = `
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
+                        ${initial}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">${name}</p>
+                        <p class="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">${roleLabel}</p>
+                    </div>
+                    <button onclick="logout()" class="p-1.5 text-gray-400 hover:text-red-500 transition rounded-lg hover:bg-red-50" title="ออกจากระบบ">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            desktopUserInfo.classList.remove('hidden');
+        } else {
+            desktopUserInfo.innerHTML = '';
+            desktopUserInfo.classList.add('hidden');
         }
     }
 
@@ -197,6 +275,14 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchAwards();
     validateSession(); // Check auth on load
     updateAuthUI();
+
+    // Login on Enter Key
+    const loginPwd = document.getElementById('login-password');
+    if (loginPwd) {
+        loginPwd.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doLogin();
+        });
+    }
 });
 
 async function fetchAwards() {
@@ -216,60 +302,17 @@ async function fetchAwards() {
 }
 
 function processAndRender() {
-    // 1. Group Data
-    groupedData = groupAwards(rawData);
+    // 1. New API is already grouped/structured properly
+    groupedData = rawData;
 
     // 2. Sort Data (Initial: Latest)
-    // This also sets filteredData and renders first page
     handleSort();
 
     // 3. Update Stats
     updateDashboardStats();
 }
 
-function groupAwards(data) {
-    const groups = {};
-
-    data.forEach(item => {
-        // Key = Comp Name + Award Date + Rank + Timestamp (Strict Grouping)
-        const dateRaw = item["Award Date"] || 'unknown';
-        const dateStr = normalizeDate(dateRaw) ? normalizeDate(dateRaw).toISOString() : dateRaw;
-        // Add Timestamp to key if available to separate different submissions
-        const timestamp = item["Timestamp"] || '';
-        const key = `${item["Competition Name"]}_${dateStr}_${item["Award Rank"]}_${timestamp}`;
-
-        if (!groups[key]) {
-            groups[key] = {
-                ...item, // Keep base info
-                students: [],
-                teachers: []
-            };
-        }
-
-        // Add person to appropriate list
-        const person = {
-            prefix: item["Prefix"],
-            name: item["Name"],
-            grade: item["Grade"],
-            room: item["Room"],
-            dept: item["Person Department"],
-            role: item["Role"]
-        };
-
-        // Check duplicates based on name
-        if (item["Role"] === "Student") {
-            if (!groups[key].students.some(s => s.name === person.name)) {
-                groups[key].students.push(person);
-            }
-        } else if (item["Role"] === "Teacher") {
-            if (!groups[key].teachers.some(t => t.name === person.name)) {
-                groups[key].teachers.push(person);
-            }
-        }
-    });
-
-    return Object.values(groups);
-}
+// Old groupAwards function removed as API now returns structured data
 
 // --- DATE NORMALIZATION (Feature #30) ---
 function normalizeDate(dateString) {
@@ -296,15 +339,20 @@ function handleSort() {
 
 function sortAwards(data, criteria) {
     data.sort((a, b) => {
-        const dateA = normalizeDate(a["Award Date"]) || new Date(0);
-        const dateB = normalizeDate(b["Award Date"]) || new Date(0);
-
         if (criteria === 'latest') {
-            return dateB - dateA;
-        } else if (criteria === 'rank') {
-            return getRankWeight(b["Award Rank"]) - getRankWeight(a["Award Rank"]);
+            // Sort by Metadata Timestamp (Recently Added)
+            const timeA = new Date(a.timestamp || 0);
+            const timeB = new Date(b.timestamp || 0);
+            return timeB - timeA;
+        }
+
+        const dateA = normalizeDate(a.awardDate) || new Date(0);
+        const dateB = normalizeDate(b.awardDate) || new Date(0);
+
+        if (criteria === 'rank') {
+            return getRankWeight(b.rank) - getRankWeight(a.rank);
         } else if (criteria === 'level') {
-            return getLevelWeight(b["Award Level"]) - getLevelWeight(a["Award Level"]);
+            return getLevelWeight(b.level) - getLevelWeight(a.level);
         }
         return 0;
     });
@@ -333,13 +381,18 @@ function getLevelWeight(level) {
 function handleSearch() {
     const query = document.getElementById('search-input').value.toLowerCase();
     filteredData = groupedData.filter(item => {
-        const matchComp = item["Competition Name"]?.toLowerCase().includes(query);
-        const matchStudent = item.students.some(s => s.name?.toLowerCase().includes(query));
+        const matchComp = item.competition?.toLowerCase().includes(query);
+        const matchStudent = item.students?.some(s => s.name?.toLowerCase().includes(query));
 
         // Enhanced Search
-        const matchTeacher = item.teachers.some(t => t.name?.toLowerCase().includes(query));
-        const matchDept = item["Department"]?.toLowerCase().includes(query);
-        const matchOrg = item["Organizer"]?.toLowerCase().includes(query);
+        const matchTeacher = item.teachers?.some(t => t.name?.toLowerCase().includes(query));
+
+        // Handle array fields for search
+        const deptStr = toArray(item.department).join(' ').toLowerCase();
+        const groupStr = toArray(item.onBehalfOf).join(' ').toLowerCase();
+
+        const matchDept = deptStr.includes(query) || groupStr.includes(query);
+        const matchOrg = item.organizer?.toLowerCase().includes(query);
 
         return matchComp || matchStudent || matchTeacher || matchDept || matchOrg;
     });
@@ -455,12 +508,29 @@ function showDeptStats() {
     const deptStats = {};
 
     // 1. Aggregate Stats
+    // 1. Aggregate Stats
     groupedData.forEach(item => {
-        const dept = item["Department"] || "ไม่ระบุ";
-        if (!deptStats[dept]) {
-            deptStats[dept] = 0;
+        // Use Subject Group (onBehalfOf) as primary, fallback to Work Group
+        const groups = toArray(item.onBehalfOf);
+
+        if (groups.length > 0) {
+            groups.forEach(g => {
+                if (!deptStats[g]) deptStats[g] = 0;
+                deptStats[g]++;
+            });
+        } else {
+            // Fallback to Work Group if no Subject Group
+            const works = toArray(item.department);
+            if (works.length > 0) {
+                works.forEach(w => {
+                    if (!deptStats[w]) deptStats[w] = 0;
+                    deptStats[w]++;
+                });
+            } else {
+                if (!deptStats['ไม่ระบุ']) deptStats['ไม่ระบุ'] = 0;
+                deptStats['ไม่ระบุ']++;
+            }
         }
-        deptStats[dept]++;
     });
 
     // 2. Sort
@@ -505,6 +575,238 @@ function showDeptStats() {
     });
 }
 
+// --- SUBJECT SUMMARY VIEW (Feature) ---
+let activeSubjectFilter = 'all';
+
+function renderSubjectSummary() {
+
+    const query = (document.getElementById('subject-search-input')?.value || '').toLowerCase();
+
+    // 1. Filter by active subject group
+    let filtered = [...groupedData];
+
+    if (activeSubjectFilter !== 'all') {
+        filtered = filtered.filter(item => {
+            const groups = toArray(item.onBehalfOf);
+            const works = toArray(item.department);
+            // Match if activeFilter is present in either array
+            return groups.includes(activeSubjectFilter) || works.includes(activeSubjectFilter);
+        });
+    }
+
+    // 2. Search filter
+    if (query) {
+        filtered = filtered.filter(item =>
+            (item.competition || '').toLowerCase().includes(query) ||
+            (item.onBehalfOf || '').toLowerCase().includes(query) ||
+            (item.department || '').toLowerCase().includes(query) ||
+            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
+        );
+    }
+
+    // 3. Calculate level stats
+    let total = filtered.length;
+    let inter = 0, nation = 0, region = 0;
+
+    filtered.forEach(item => {
+        const lvl = normalizeLevel(item.level);
+        if (lvl === 'international') inter++;
+        else if (lvl === 'nation') nation++;
+        else if (lvl === 'region') region++;
+    });
+
+    // 4. Update stat cards
+    document.getElementById('stat-summary-total').innerText = total;
+    document.getElementById('stat-inter').innerText = inter;
+    document.getElementById('stat-nation').innerText = nation;
+    document.getElementById('stat-region').innerText = region;
+
+    // 5. Render result list
+    const listContainer = document.getElementById('subject-result-list');
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `
+            <div class="text-center py-16 text-gray-400">
+                <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-3 opacity-50"></i>
+                <p class="font-medium">ไม่พบข้อมูลผลงาน</p>
+                <p class="text-sm mt-1">ลองเลือกกลุ่มสาระอื่น หรือค้นหาด้วยคำอื่น</p>
+            </div>`;
+        lucide.createIcons();
+        return;
+    }
+
+    // Group by subject for display
+    const groups = {};
+    filtered.forEach(item => {
+        const deptGroups = toArray(item.onBehalfOf);
+        const workGroups = toArray(item.department);
+
+        let hasGroup = false;
+
+        // Add to all relevant Subject Groups
+        deptGroups.forEach(d => {
+            if (!groups[d]) groups[d] = [];
+            groups[d].push(item);
+            hasGroup = true;
+        });
+
+        // If no Subject Groups, try Work Groups? 
+        // Or should we list under Work Groups too? User req: "Subject and Work groups"
+        // Let's list under Work Groups ONLY if no Subject Group (to avoid clutter?) 
+        // OR list under ALL? 
+        // Current logic in renderSubjectFilters prioritized Subject Group.
+        // Let's allow listing under Work Groups too if they exist.
+        workGroups.forEach(w => {
+            if (!groups[w]) groups[w] = [];
+            // Avoid adding same item twice to same group (unlikely but safe)
+            if (!groups[w].includes(item)) groups[w].push(item);
+            hasGroup = true;
+        });
+
+        if (!hasGroup) {
+            if (!groups['อื่นๆ']) groups['อื่นๆ'] = [];
+            groups['อื่นๆ'].push(item);
+        }
+    });
+
+    let html = '';
+    Object.keys(groups).sort().forEach(deptName => {
+        const items = groups[deptName];
+        html += `
+            <div class="mb-6">
+                <div class="flex items-center gap-2 mb-3">
+                    <div class="w-1.5 h-5 bg-blue-500 rounded-full"></div>
+                    <h4 class="font-bold text-gray-800 dark:text-white text-sm">${deptName}</h4>
+                    <span class="text-xs text-gray-400 font-medium">(${items.length} ผลงาน)</span>
+                </div>
+                <div class="space-y-2">
+        `;
+
+        items.forEach(item => {
+            const globalIdx = groupedData.indexOf(item);
+            const r = item.rank || '';
+            let rankClass = 'bg-blue-100 text-blue-800';
+            if (r.includes('ทอง') || r.includes('ชนะเลิศ')) rankClass = 'bg-yellow-100 text-yellow-800';
+            else if (r.includes('เงิน')) rankClass = 'bg-gray-100 text-gray-700';
+            else if (r.includes('ทองแดง')) rankClass = 'bg-orange-100 text-orange-800';
+            else if (r.includes('ชมเชย')) rankClass = 'bg-teal-100 text-teal-800';
+            else if (r.includes('เข้าร่วม')) rankClass = 'bg-slate-100 text-slate-600';
+
+            const l = item.level || '';
+            let levelClass = 'bg-gray-100 text-gray-600';
+            if (l.includes('ประเทศ')) levelClass = 'bg-purple-100 text-purple-700';
+            if (l.includes('นานาชาติ')) levelClass = 'bg-pink-100 text-pink-700';
+            if (l.includes('ภาค')) levelClass = 'bg-indigo-100 text-indigo-700';
+            if (l.includes('เขต')) levelClass = 'bg-blue-100 text-blue-700';
+
+            const studentNames = (item.students || []).map(s => s.name || '-').join(', ');
+
+            html += `
+                <div onclick="openDetailFromSummary(${globalIdx})"
+                     class="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 hover:shadow-md transition cursor-pointer group">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold text-gray-800 dark:text-white text-sm truncate group-hover:text-blue-600 transition">${item.competition || '-'}</p>
+                            <p class="text-xs text-gray-400 mt-1 truncate">${studentNames || 'ไม่มีข้อมูลนักเรียน'}</p>
+                            <p class="text-[10px] text-gray-400 mt-0.5">เพิ่มเมื่อ: ${formatTimestamp(item.timestamp)}</p>
+                        </div>
+                        <div class="flex flex-col items-end gap-1 shrink-0">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${rankClass}">${item.rank || '-'}</span>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-medium ${levelClass}">${item.level || '-'}</span>
+                            ${(item.fileUrls && (Array.isArray(item.fileUrls) ? item.fileUrls.length > 0 : item.fileUrls)) ?
+                    `<button onclick="event.stopPropagation(); openDetailFromSummary(${globalIdx})" class="px-2 py-0.5 text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md font-bold flex items-center gap-1 transition">
+                                    <i data-lucide="paperclip" class="w-3 h-3"></i>
+                                </button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div></div>`;
+    });
+
+    listContainer.innerHTML = html;
+    lucide.createIcons();
+}
+
+function renderSubjectFilters() {
+    // Collect unique subject groups
+    // Collect unique subject groups & work groups
+    const deptSet = new Set();
+    groupedData.forEach(item => {
+        const groups = toArray(item.onBehalfOf);
+        const works = toArray(item.department);
+
+        groups.forEach(g => deptSet.add(g));
+        works.forEach(w => deptSet.add(w));
+
+        if (groups.length === 0 && works.length === 0) deptSet.add('อื่นๆ');
+    });
+
+    const departments = [...deptSet].sort();
+
+    // Desktop sidebar filters
+    const sidebarList = document.getElementById('sidebar-filter-list');
+    if (sidebarList) {
+        const allActive = activeSubjectFilter === 'all';
+        let sidebarHtml = `
+            <button onclick="setSubjectFilter('all')"
+                class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition mb-1
+                ${allActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800'}">
+                <span>ทั้งหมด</span>
+                <span class="ml-2 text-[10px] font-bold ${allActive ? 'text-blue-500' : 'text-gray-400'}">${groupedData.length}</span>
+            </button>
+        `;
+
+        departments.forEach(dept => {
+            const isActive = activeSubjectFilter === dept;
+            // Count items that have this dept in their arrays
+            const count = groupedData.filter(i => {
+                const groups = toArray(i.onBehalfOf);
+                const works = toArray(i.department);
+                return groups.includes(dept) || works.includes(dept);
+            }).length;
+
+            const safeDept = dept.replace(/'/g, "\\'");
+            sidebarHtml += `
+                <button onclick="setSubjectFilter('${safeDept}')"
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition
+                    ${isActive ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-800'}">
+                    <span class="truncate">${dept}</span>
+                    <span class="ml-2 text-[10px] font-bold ${isActive ? 'text-blue-500' : 'text-gray-400'}">${count}</span>
+                </button>
+            `;
+        });
+
+        sidebarList.innerHTML = sidebarHtml;
+    }
+
+    // Mobile Dropdown Logic
+    const mobileDropdown = document.getElementById('subject-dropdown-mobile');
+    if (mobileDropdown) {
+        let options = `<option value="all" ${activeSubjectFilter === 'all' ? 'selected' : ''}>ทุกกลุ่มสาระฯ (${groupedData.length})</option>`;
+
+        departments.forEach(dept => {
+            const count = groupedData.filter(i => (i.onBehalfOf || i.department || 'อื่นๆ') === dept).length;
+            const isSelected = activeSubjectFilter === dept ? 'selected' : '';
+            options += `<option value="${dept}" ${isSelected}>${dept} (${count})</option>`;
+        });
+
+        mobileDropdown.innerHTML = options;
+    }
+}
+
+function setSubjectFilter(filter) {
+    activeSubjectFilter = filter;
+    renderSubjectFilters();
+    renderSubjectSummary();
+}
+
+function handleSubjectSearch() {
+    renderSubjectSummary();
+}
+
 function renderAwards() {
     const list = document.getElementById('award-list');
     const controls = document.getElementById('pagination-controls');
@@ -531,7 +833,7 @@ function renderAwards() {
     list.innerHTML = pageData.map((item, idx) => {
         // Fixed Date Logic using normalizeDate
         let dateStr = '-';
-        const normalDate = normalizeDate(item["Award Date"]);
+        const normalDate = normalizeDate(item.awardDate);
         if (normalDate) {
             dateStr = normalDate.toLocaleDateString('th-TH', {
                 day: 'numeric',
@@ -542,33 +844,41 @@ function renderAwards() {
 
         // Rank Formatting
         let rankClass = "bg-blue-100 text-blue-800";
-        const r = item["Award Rank"] || "";
+        const r = item.rank || "";
         if (r.includes("ทอง") || r.includes("ชนะเลิศ")) rankClass = "bg-yellow-100 text-yellow-800";
         else if (r.includes("เงิน")) rankClass = "bg-gray-100 text-gray-700";
         else if (r.includes("ทองแดง")) rankClass = "bg-orange-100 text-orange-800";
         else if (r.includes("ชมเชย")) rankClass = "bg-teal-100 text-teal-800";
 
         let levelClass = "bg-gray-100 text-gray-600";
-        const l = item["Award Level"] || "";
+        const l = item.level || "";
         if (l.includes("ประเทศ")) levelClass = "bg-purple-100 text-purple-700";
         if (l.includes("นานาชาติ")) levelClass = "bg-pink-100 text-pink-700";
         if (l.includes("ภาค")) levelClass = "bg-indigo-100 text-indigo-700";
+        if (l.includes("เขต")) levelClass = "bg-blue-100 text-blue-700";
+        if (l.includes("อำเภอ")) levelClass = "bg-teal-100 text-teal-700";
 
-        const dept = item["Department"] || "";
+        // Department Logic (Array Support)
+        const groups = toArray(item.onBehalfOf);
+        const works = toArray(item.department);
+        let deptStr = '';
+        if (groups.length > 0) deptStr = groups.join(', ');
+        if (works.length > 0) {
+            if (deptStr) deptStr += ' / ' + works.join(', ');
+            else deptStr = works.join(', ');
+        }
+        const dept = deptStr || "-";
 
         // Avatars
-        const avatarHTML = item.students.slice(0, 3).map(s => {
+        const students = item.students || [];
+        const teachers = item.teachers || [];
+
+        const avatarHTML = students.slice(0, 3).map(s => {
             const char = s.name ? s.name.charAt(0) : '?';
             return `<div class="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 cursor-help" title="${s.name}">${char}</div>`;
         }).join('');
-        const moreCount = item.students.length > 3 ? `<div class="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">+${item.students.length - 3}</div>` : '';
+        const moreCount = students.length > 3 ? `<div class="inline-block h-6 w-6 rounded-full ring-2 ring-white bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">+${students.length - 3}</div>` : '';
 
-        // We need to pass the index of filteredData to open detail? 
-        // Or just stringify item? Stringify might be risky with quotes. 
-        // Better to map to Global Index or use a lookup.
-        // Simplified: Store pageData in a variable accessible or just pass index relative to slice?
-        // Let's attach a data-id or click handler that uses a closure.
-        // We'll use a hack to store the item index from the global filteredData array.
         const globalIndex = start + idx;
 
         return `
@@ -576,16 +886,20 @@ function renderAwards() {
                     <div class="flex justify-between items-start mb-2 relative z-10">
                         <div class="flex gap-2">
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${rankClass} ring-1 ring-inset ring-black/5 dark:ring-white/10">
-                                ${item["Award Rank"] || 'รางวัล'}
+                                ${item.rank || 'รางวัล'}
                             </span>
                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium ${levelClass} ring-1 ring-inset ring-black/5 dark:ring-white/10">
-                                ${item["Award Level"] || 'ทั่วไป'}
+                                ${item.level || 'ทั่วไป'}
                             </span>
                         </div>
                         <span class="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap ml-2 font-medium">${dateStr}</span>
                     </div>
-                    <h3 class="font-bold text-slate-800 dark:text-white text-lg leading-tight mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition tracking-tight line-clamp-2 relavtie z-10">${item["Competition Name"]}</h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-1 relative z-10">${dept}</p>
+                    <h3 class="font-bold text-slate-800 dark:text-white text-lg leading-tight mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition tracking-tight line-clamp-2 relavtie z-10">${item.competition}</h3>
+                    <div class="text-xs text-slate-500 dark:text-slate-400 mb-4 relative z-10">
+                        <div class="font-medium truncate" title="${dept}">${dept}</div>
+                        <!-- Extra dept div removed since joined above -->
+                        <div class="text-[10px] text-slate-300 dark:text-slate-600 mt-1">เพิ่มเมื่อ: ${formatTimestamp(item.timestamp)}</div>
+                    </div>
                     
                     <div class="flex justify-between items-end border-t border-slate-100 dark:border-slate-700/50 pt-3 mt-2 relative z-10">
                         <div class="flex -space-x-2 overflow-hidden items-center pl-1">
@@ -593,8 +907,12 @@ function renderAwards() {
                             ${moreCount}
                         </div>
                         <div class="text-[10px] text-slate-400 flex flex-col items-end font-medium">
-                            ${item.students.length > 0 ? `<span>นักเรียน ${item.students.length} คน</span>` : ''}
-                            ${item.teachers.length > 0 ? `<span>ครู ${item.teachers.length} คน</span>` : ''}
+                            ${students.length > 0 ? `<span>นักเรียน ${students.length} คน</span>` : ''}
+                            ${teachers.length > 0 ? `<span>ครู ${teachers.length} คน</span>` : ''}
+                            ${(item.fileUrls && (Array.isArray(item.fileUrls) ? item.fileUrls.length > 0 : item.fileUrls)) ?
+                `<button onclick="event.stopPropagation(); openDetail(${globalIndex})" class="mt-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded-md transition">
+                                    <i data-lucide="paperclip" class="w-3 h-3"></i> หลักฐาน
+                                </button>` : ''}
                         </div>
                     </div>
                     
@@ -606,8 +924,29 @@ function renderAwards() {
     lucide.createIcons();
 }
 
-// --- DETAIL MODAL LOGIC (Feature #31, #32, #33) ---
-// --- DETAIL MODAL LOGIC ---
+// --- DETAIL MODAL LOGIC (Cleaned up) ---
+function getRankWeight(rank) {
+    if (!rank) return 0;
+    const r = rank.toLowerCase();
+    if (r.includes("ชนะเลิศ") || r.includes("เหรียญทอง")) return 5;
+    if (r.includes("รองชนะเลิศอันดับ 1") || r.includes("เหรียญเงิน")) return 4;
+    if (r.includes("รองชนะเลิศอันดับ 2") || r.includes("เหรียญทองแดง")) return 3;
+    if (r.includes("ชมเชย")) return 2;
+    if (r.includes("เข้าร่วม")) return 1;
+    return 0;
+}
+
+function getLevelWeight(level) {
+    if (!level) return 0;
+    const l = level.toLowerCase();
+    if (l.includes("นานาชาติ")) return 5;
+    if (l.includes("ประเทศ")) return 4;
+    if (l.includes("ภาค")) return 3;
+    if (l.includes("เขต")) return 2;
+    if (l.includes("จังหวัด") || l.includes("อำเภอ")) return 1;
+    return 0;
+}
+
 function openDetail(index) {
     const item = filteredData[index];
     if (item) populateDetailModal(item);
@@ -619,33 +958,51 @@ function openDetailFromSummary(index) {
 }
 
 function populateDetailModal(item) {
-    // Header Info
-    document.getElementById('detail-title').innerText = item["Competition Name"];
-    document.getElementById('detail-subtitle').innerText = item["Department"] || item["Organizer"] || "";
-    document.getElementById('detail-rank-badge').innerText = item["Award Rank"];
-    document.getElementById('detail-level-badge').innerText = item["Award Level"];
+    document.getElementById('detail-title').innerText = item.competition;
+
+    const groups = toArray(item.onBehalfOf);
+    const departments = toArray(item.department);
+    const organizer = item.organizer ? toArray(item.organizer) : [];
+
+    let subHtml = '';
+    if (groups.length > 0) subHtml += groups.join(', ');
+    if (organizer.length > 0) {
+        if (subHtml) subHtml += ' / ';
+        subHtml += organizer.join(', ');
+    }
+    if (departments.length > 0) {
+        if (subHtml) subHtml += `<br><span class="text-xs opacity-75">${departments.join(', ')}</span>`;
+        else subHtml += `<span class="text-xs opacity-75">${departments.join(', ')}</span>`;
+    }
+    document.getElementById('detail-subtitle').innerHTML = subHtml || '-';
+
+    const ranks = toArray(item.rank);
+    const levels = toArray(item.level);
+
+    document.getElementById('detail-rank-badge').innerText = ranks.join(', ') || 'รางวัล';
+    document.getElementById('detail-level-badge').innerText = levels.join(', ') || 'ทั่วไป';
 
     // Set Badge Colors
-    const r = item["Award Rank"] || "";
     let rankClass = "bg-blue-100 text-blue-800";
-    if (r.includes("ทอง") || r.includes("ชนะเลิศ")) rankClass = "bg-yellow-100 text-yellow-800";
-    else if (r.includes("เงิน")) rankClass = "bg-gray-100 text-gray-700";
-    else if (r.includes("ทองแดง")) rankClass = "bg-orange-100 text-orange-800";
-    else if (r.includes("ชมเชย")) rankClass = "bg-teal-100 text-teal-800";
+    if (ranks.some(r => r.includes("ทอง") || r.includes("ชนะเลิศ"))) rankClass = "bg-yellow-100 text-yellow-800";
+    else if (ranks.some(r => r.includes("เงิน"))) rankClass = "bg-gray-100 text-gray-700";
+    else if (ranks.some(r => r.includes("ทองแดง"))) rankClass = "bg-orange-100 text-orange-800";
+    else if (ranks.some(r => r.includes("ชมเชย"))) rankClass = "bg-teal-100 text-teal-800";
 
     document.getElementById('detail-rank-badge').className = `px-2.5 py-0.5 rounded-full text-xs font-bold ${rankClass}`;
 
-    const l = normalizeLevel(item["Award Level"]);
     let levelClass = "bg-gray-100 text-gray-600";
-    if (l === 'nation') levelClass = "bg-purple-100 text-purple-700";
-    else if (l === 'international') levelClass = "bg-pink-100 text-pink-700";
-    else if (l === 'region') levelClass = "bg-indigo-100 text-indigo-700";
+    if (levels.some(l => l.includes("ประเทศ"))) levelClass = "bg-purple-100 text-purple-700";
+    else if (levels.some(l => l.includes("นานาชาติ"))) levelClass = "bg-pink-100 text-pink-700";
+    else if (levels.some(l => l.includes("ภาค"))) levelClass = "bg-indigo-100 text-indigo-700";
+    else if (levels.some(l => l.includes("เขต"))) levelClass = "bg-blue-100 text-blue-700";
+    else if (levels.some(l => l.includes("อำเภอ"))) levelClass = "bg-teal-100 text-teal-700";
 
     document.getElementById('detail-level-badge').className = `px-2.5 py-0.5 rounded-full text-xs font-bold ${levelClass}`;
 
     // Date
     let dateStr = '-';
-    const normalDate = normalizeDate(item["Award Date"]);
+    const normalDate = normalizeDate(item.awardDate);
     if (normalDate) {
         dateStr = 'วันที่ได้รับรางวัล: ' + normalDate.toLocaleDateString('th-TH', {
             dateStyle: 'long'
@@ -653,41 +1010,61 @@ function populateDetailModal(item) {
     }
     document.getElementById('detail-date').innerText = dateStr;
 
-    // Evidence Link & Preview
-    const linkBtn = document.getElementById('detail-link-btn');
-    const previewBtn = document.getElementById('detail-preview-btn');
+    // Evidence Link & Preview (Multi-File Support)
     const actionsDiv = document.getElementById('evidence-actions');
     const noLink = document.getElementById('detail-no-link');
     const previewContainer = document.getElementById('preview-container');
     const previewFrame = document.getElementById('preview-frame');
 
     // Reset state
+    actionsDiv.innerHTML = ''; // Clear previous buttons
     previewContainer.classList.add('hidden');
     previewFrame.src = '';
 
-    const fileUrl = item["File URL"];
-    if (fileUrl) {
-        linkBtn.href = fileUrl;
+    const urls = toArray(item.fileUrls); // Ensure fileUrls is an array
+
+    if (urls.length > 0) {
         actionsDiv.classList.remove('hidden');
-        actionsDiv.classList.add('flex');
+        actionsDiv.classList.add('flex', 'flex-wrap', 'gap-2');
         noLink.classList.add('hidden');
 
-        // Check if Google Drive Link
-        let fileId = null;
-        if (fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)) {
-            fileId = fileUrl.match(/\/d\/([a-zA-Z0-9_-]+)/)[1];
-        } else if (fileUrl.match(/id=([a-zA-Z0-9_-]+)/)) {
-            fileId = fileUrl.match(/id=([a-zA-Z0-9_-]+)/)[1];
-        }
+        urls.forEach((url, index) => {
+            // 1. View Button (External Link)
+            const viewBtn = document.createElement('a');
+            viewBtn.href = url;
+            viewBtn.target = '_blank';
+            viewBtn.className = 'inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 transition';
+            viewBtn.innerHTML = `<i data-lucide="external-link" class="w-4 h-4"></i> หลักฐาน ${index + 1}`;
+            actionsDiv.appendChild(viewBtn);
 
-        if (fileId) {
-            previewBtn.classList.remove('hidden');
-            previewBtn.classList.add('flex');
-            previewBtn.dataset.embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-        } else {
-            previewBtn.classList.add('hidden');
-            previewBtn.classList.remove('flex');
-        }
+            // 2. Preview Button (If Google Drive)
+            let fileId = null;
+            if (url.match(/\/d\/([a-zA-Z0-9_-]+)/)) {
+                fileId = url.match(/\/d\/([a-zA-Z0-9_-]+)/)[1];
+            } else if (url.match(/id=([a-zA-Z0-9_-]+)/)) {
+                fileId = url.match(/id=([a-zA-Z0-9_-]+)/)[1];
+            }
+
+            if (fileId) {
+                const previewBtn = document.createElement('button');
+                previewBtn.className = 'inline-flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-100 transition';
+                previewBtn.innerHTML = `<i data-lucide="eye" class="w-4 h-4"></i> ตัวอย่าง ${index + 1}`;
+
+                previewBtn.onclick = () => {
+                    const embedUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+                    if (!previewContainer.classList.contains('hidden') && previewFrame.src === embedUrl) {
+                        // Close if clicking the same active preview
+                        previewContainer.classList.add('hidden');
+                        previewFrame.src = '';
+                    } else {
+                        // Open new preview
+                        previewContainer.classList.remove('hidden');
+                        previewFrame.src = embedUrl;
+                    }
+                };
+                actionsDiv.appendChild(previewBtn);
+            }
+        });
     } else {
         actionsDiv.classList.add('hidden');
         actionsDiv.classList.remove('flex');
@@ -695,10 +1072,11 @@ function populateDetailModal(item) {
     }
 
     // Students
-    document.getElementById('detail-std-count').innerText = item.students ? item.students.length : 0;
+    const students = item.students || [];
+    document.getElementById('detail-std-count').innerText = students.length;
     const stdContainer = document.getElementById('detail-std-list');
-    if (item.students && item.students.length > 0) {
-        stdContainer.innerHTML = item.students.map(s => {
+    if (students.length > 0) {
+        stdContainer.innerHTML = students.map(s => {
             const char = s.name ? s.name.charAt(0) : '?';
             return `
                     <div class="p-3 bg-white border border-gray-100 rounded-lg shadow-sm flex items-center justify-between">
@@ -717,10 +1095,11 @@ function populateDetailModal(item) {
     }
 
     // Teachers
-    document.getElementById('detail-tch-count').innerText = item.teachers ? item.teachers.length : 0;
+    const teachers = item.teachers || [];
+    document.getElementById('detail-tch-count').innerText = teachers.length;
     const tchContainer = document.getElementById('detail-tch-list');
-    if (item.teachers && item.teachers.length > 0) {
-        tchContainer.innerHTML = item.teachers.map(t => {
+    if (teachers.length > 0) {
+        tchContainer.innerHTML = teachers.map(t => {
             const char = t.name ? t.name.charAt(0) : '?';
             return `
                     <div class="p-3 bg-white border border-gray-100 rounded-lg shadow-sm flex items-center justify-between">
@@ -840,10 +1219,7 @@ function switchView(viewName) {
     const sidebarFilters = document.getElementById('sidebar-filters');
     if (viewName === 'subject-summary') {
         sidebarFilters.classList.remove('hidden');
-        // Render filters into sidebar if desktop
-        if (window.innerWidth >= 1024) {
-            renderSubjectFilters();
-        }
+        renderSubjectFilters();
     } else {
         sidebarFilters.classList.add('hidden');
     }
@@ -887,8 +1263,121 @@ let currentStep = 1;
 const totalSteps = 4;
 let students = [];
 let teachers = [];
+let selectedDeptGroups = [];  // กลุ่มสาระ multi-select
+let selectedWorkGroups = [];  // กลุ่มงาน multi-select
 let editingTeacherIndex = -1;
 let editingStudentIndex = -1;
+
+// Helper: normalize API value to array
+function toArray(val) {
+    if (Array.isArray(val)) return val;
+    if (!val) return [];
+    return String(val).split(', ').filter(Boolean);
+}
+
+// --- MULTI-SELECT: กลุ่มสาระ ---
+function addDeptGroup() {
+    const sel = document.getElementById('comp-dept-group');
+    const val = sel.value;
+    if (!val) { showToast('กรุณาเลือกกลุ่มสาระก่อน', 'error'); return; }
+
+    // "ไม่มีกลุ่มสาระ" is exclusive
+    if (val === 'ไม่มีกลุ่มสาระ') {
+        selectedDeptGroups = ['ไม่มีกลุ่มสาระ'];
+    } else {
+        // Remove "ไม่มี" if present
+        selectedDeptGroups = selectedDeptGroups.filter(d => d !== 'ไม่มีกลุ่มสาระ');
+        if (selectedDeptGroups.includes(val)) {
+            showToast('เพิ่มกลุ่มสาระนี้ไปแล้ว', 'error'); return;
+        }
+        selectedDeptGroups.push(val);
+    }
+    sel.value = '';
+    renderDeptGroups();
+    showToast('เพิ่มกลุ่มสาระแล้ว', 'success');
+}
+
+function removeDeptGroup(idx) {
+    selectedDeptGroups.splice(idx, 1);
+    renderDeptGroups();
+}
+
+function renderDeptGroups() {
+    const container = document.getElementById('dept-group-list');
+    if (!container) return;
+    if (selectedDeptGroups.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-400 italic py-1">ยังไม่ได้เลือกกลุ่มสาระ</p>';
+        return;
+    }
+    container.innerHTML = selectedDeptGroups.map((d, idx) => `
+        <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-blue-50 border border-blue-100 group">
+            <div class="flex items-center gap-2">
+                <div class="w-5 h-5 rounded-full bg-blue-200 text-blue-700 flex items-center justify-center text-[10px] font-bold shrink-0">${idx + 1}</div>
+                <span class="text-sm font-medium text-blue-800">${d}</span>
+            </div>
+            <button onclick="removeDeptGroup(${idx})" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg transition">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
+
+// --- MULTI-SELECT: กลุ่มงาน ---
+function addWorkGroup() {
+    const sel = document.getElementById('comp-dept-work');
+    let val = sel.value;
+
+    // Handle "อื่นๆ" custom input
+    if (val === 'other') {
+        const otherInput = document.getElementById('comp-work-other');
+        val = otherInput.value.trim();
+        if (!val) { showToast('กรุณาพิมพ์ชื่อกลุ่มงาน', 'error'); return; }
+        otherInput.value = '';
+    }
+
+    if (!val) { showToast('กรุณาเลือกกลุ่มงานก่อน', 'error'); return; }
+
+    // "ไม่มีกลุ่มงาน" is exclusive
+    if (val === 'ไม่มีกลุ่มงาน') {
+        selectedWorkGroups = ['ไม่มีกลุ่มงาน'];
+    } else {
+        selectedWorkGroups = selectedWorkGroups.filter(d => d !== 'ไม่มีกลุ่มงาน');
+        if (selectedWorkGroups.includes(val)) {
+            showToast('เพิ่มกลุ่มงานนี้ไปแล้ว', 'error'); return;
+        }
+        selectedWorkGroups.push(val);
+    }
+    sel.value = '';
+    renderWorkGroups();
+    showToast('เพิ่มกลุ่มงานแล้ว', 'success');
+}
+
+function removeWorkGroup(idx) {
+    selectedWorkGroups.splice(idx, 1);
+    renderWorkGroups();
+}
+
+function renderWorkGroups() {
+    const container = document.getElementById('dept-work-list');
+    if (!container) return;
+    if (selectedWorkGroups.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-400 italic py-1">ยังไม่ได้เลือกกลุ่มงาน</p>';
+        return;
+    }
+    container.innerHTML = selectedWorkGroups.map((d, idx) => `
+        <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-indigo-50 border border-indigo-100 group">
+            <div class="flex items-center gap-2">
+                <div class="w-5 h-5 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center text-[10px] font-bold shrink-0">${idx + 1}</div>
+                <span class="text-sm font-medium text-indigo-800">${d}</span>
+            </div>
+            <button onclick="removeWorkGroup(${idx})" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg transition">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    `).join('');
+    lucide.createIcons();
+}
 
 // Helper to normalize level strings to standard keys
 function normalizeLevel(levelRaw) {
@@ -906,6 +1395,7 @@ function normalizeLevel(levelRaw) {
 
 // Helper to get priority weight (Level > Rank)
 function getPriorityWeight(levelRaw, rank) {
+    if (!rank) rank = '';
     const level = normalizeLevel(levelRaw);
     let levelWeight = 0;
 
@@ -965,41 +1455,43 @@ function changeStep(direction) {
         let firstInvalid = null;
 
         const nameEl = document.getElementById('comp-name');
-        const deptEl = document.getElementById('comp-dept');
+        const orgEl = document.getElementById('comp-org');
+        const dateEl = document.getElementById('comp-date');
         const levelEl = document.querySelector('input[name="level"]:checked');
         const levelContainer = document.getElementById('level-container');
         const rankEl = document.getElementById('comp-rank');
 
-        // Validate Name
+        // 1. Validate Competition Name
         if (!nameEl.value.trim()) {
             showError(nameEl);
             isValid = false;
             if (!firstInvalid) firstInvalid = nameEl;
         }
 
-        // Validate Dept
-        if (!deptEl.value) {
-            showError(deptEl);
+        // 2. Validate Organizer
+        if (!orgEl.value.trim()) {
+            showError(orgEl);
             isValid = false;
-            if (!firstInvalid) firstInvalid = deptEl;
-        } else if (deptEl.value === 'other') {
-            const otherDept = document.getElementById('comp-dept-other');
-            if (!otherDept.value.trim()) {
-                showError(otherDept);
-                isValid = false;
-                if (!firstInvalid) firstInvalid = otherDept;
-            }
+            if (!firstInvalid) firstInvalid = orgEl;
         }
 
-        // Validate Level
+        // 3. Validate Date
+        if (!dateEl.value) {
+            showError(dateEl);
+            isValid = false;
+            if (!firstInvalid) firstInvalid = dateEl;
+        }
+
+        // 4. Validate Level
         if (!levelEl) {
-            // Highlight container for radio buttons
             levelContainer.classList.add('border', 'border-red-500', 'rounded-xl', 'p-1', 'bg-red-50/50');
             isValid = false;
             if (!firstInvalid) firstInvalid = levelContainer;
+        } else {
+            levelContainer.classList.remove('border', 'border-red-500', 'rounded-xl', 'p-1', 'bg-red-50/50');
         }
 
-        // Validate Rank
+        // 5. Validate Rank
         if (!rankEl.value) {
             showError(rankEl);
             isValid = false;
@@ -1013,6 +1505,26 @@ function changeStep(direction) {
             }
         }
 
+        // 6. Validate กลุ่มสาระ (Required, at least 1)
+        const deptListEl = document.getElementById('dept-group-list');
+        if (selectedDeptGroups.length === 0) {
+            deptListEl.classList.add('border', 'border-red-500', 'rounded-xl', 'p-1', 'bg-red-50/50');
+            isValid = false;
+            if (!firstInvalid) firstInvalid = deptListEl;
+        } else {
+            deptListEl.classList.remove('border', 'border-red-500', 'rounded-xl', 'p-1', 'bg-red-50/50');
+        }
+
+        // 7. Validate กลุ่มงาน (Required, at least 1)
+        const workListEl = document.getElementById('dept-work-list');
+        if (selectedWorkGroups.length === 0) {
+            workListEl.classList.add('border', 'border-red-500', 'rounded-xl', 'p-1', 'bg-red-50/50');
+            isValid = false;
+            if (!firstInvalid) firstInvalid = workListEl;
+        } else {
+            workListEl.classList.remove('border', 'border-red-500', 'rounded-xl', 'p-1', 'bg-red-50/50');
+        }
+
         if (!isValid) {
             showToast('กรุณากรอกข้อมูลที่ระบุ * ให้ครบถ้วน', 'error');
             if (firstInvalid) firstInvalid.scrollIntoView({
@@ -1022,6 +1534,16 @@ function changeStep(direction) {
             return; // Stop navigation
         }
     }
+
+    // Step 2 Validation (Students & Teachers)
+    if (direction === 1 && currentStep === 2) {
+        if (students.length === 0) {
+            showToast('กรุณาเพิ่มข้อมูลนักเรียนอย่างน้อย 1 คน', 'warning');
+            return;
+        }
+        // Teachers are optional now
+    }
+
     const newStep = currentStep + direction;
     if (newStep >= 1 && newStep <= totalSteps) {
         currentStep = newStep;
@@ -1049,27 +1571,42 @@ function clearErrors() {
     });
 }
 
-function toggleOtherDept() {
-    const val = document.getElementById('comp-dept').value;
-    const otherInput = document.getElementById('comp-dept-other');
-    if (val === 'other') {
-        otherInput.classList.remove('hidden');
-        otherInput.focus();
-    } else {
-        otherInput.classList.add('hidden');
+function setupFormListeners() {
+    // Work Group Toggle
+    const workGroupEl = document.getElementById('comp-dept-work');
+    if (workGroupEl) {
+        workGroupEl.addEventListener('change', function () {
+            const isOther = this.value === 'other';
+            const otherInput = document.getElementById('comp-work-other');
+            if (isOther) {
+                otherInput.classList.remove('hidden');
+                otherInput.focus();
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.value = ''; // Reset value
+            }
+        });
+    }
+
+    // Rank Toggle
+    const rankEl = document.getElementById('comp-rank');
+    if (rankEl) {
+        rankEl.addEventListener('change', function () {
+            const isOther = this.value === 'other';
+            const otherInput = document.getElementById('comp-rank-other');
+            if (isOther) {
+                otherInput.classList.remove('hidden');
+                otherInput.focus();
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.value = ''; // Reset value
+            }
+        });
     }
 }
 
-function toggleOtherRank() {
-    const rank = document.getElementById('comp-rank').value;
-    const otherInput = document.getElementById('comp-rank-other');
-    if (rank === 'other') {
-        otherInput.classList.remove('hidden');
-        otherInput.focus();
-    } else {
-        otherInput.classList.add('hidden');
-    }
-}
+// Initialize Listeners
+document.addEventListener('DOMContentLoaded', setupFormListeners);
 
 function openModal(id) {
     const modal = document.getElementById(id);
@@ -1318,12 +1855,10 @@ function removeTeacher(idx) {
 function renderSummary() {
     document.getElementById('summary-comp-name').innerText = document.getElementById('comp-name').value || '-';
 
-    // Department
-    let dept = document.getElementById('comp-dept').value || '-';
-    if (dept === 'other') {
-        dept = document.getElementById('comp-dept-other').value;
-    }
-    document.getElementById('summary-comp-dept').innerText = dept;
+    // Department (Multi-Select - chips display)
+    const deptStr = selectedDeptGroups.length > 0 ? selectedDeptGroups.join(', ') : '-';
+    const workStr = selectedWorkGroups.length > 0 ? selectedWorkGroups.join(', ') : '-';
+    document.getElementById('summary-comp-dept').innerText = deptStr + ' / ' + workStr;
 
     // Organization
     const org = document.getElementById('comp-org').value || '-';
@@ -1332,13 +1867,14 @@ function renderSummary() {
     const levelEl = document.querySelector('input[name="level"]:checked');
     const levelMap = {
         'school': 'ระดับโรงเรียน',
+        'district': 'ระดับอำเภอ',
         'area': 'ระดับเขตพื้นที่ฯ',
         'province': 'ระดับจังหวัด',
         'region': 'ระดับภาค',
         'nation': 'ระดับชาติ',
         'inter': 'ระดับนานาชาติ'
     };
-    document.getElementById('summary-comp-level').innerText = levelEl ? levelMap[levelEl.value] : '-';
+    document.getElementById('summary-comp-level').innerText = levelEl ? (levelMap[levelEl.value] || levelEl.value) : '-';
 
     const rankEl = document.getElementById('comp-rank');
     let rankText = rankEl.options[rankEl.selectedIndex].text;
@@ -1354,13 +1890,18 @@ function renderSummary() {
     }) : '-';
     document.getElementById('summary-comp-date').innerText = dateStr;
 
-    // Evidence File Display
+    // Evidence File Display (Multi-File)
     const evidenceContainer = document.getElementById('summary-evidence-container');
     const evidenceText = document.getElementById('summary-evidence-text');
-    if (uploadedFile) {
+
+    const files = [];
+    if (currentFiles.cert) files.push(`เกียรติบัตร: ${currentFiles.cert.name}`);
+    if (currentFiles.photo) files.push(`รูปภาพ: ${currentFiles.photo.name}`);
+
+    if (files.length > 0) {
         evidenceContainer.classList.remove('hidden');
         evidenceContainer.classList.add('flex');
-        evidenceText.textContent = uploadedFile.name;
+        evidenceText.innerHTML = files.join('<br>');
     } else {
         evidenceContainer.classList.add('hidden');
         evidenceContainer.classList.remove('flex');
@@ -1474,99 +2015,144 @@ function convertFileToBase64(file) {
     });
 }
 
-async function submitForm() {
+// --- FORM SUBMISSION (Updated) ---
+async function saveAward() {
     // 1. Show Loading
     const loading = document.getElementById('loading');
     loading.classList.remove('invisible');
     loading.style.visibility = 'visible';
 
     try {
-        const params = new URLSearchParams();
-
-        // Security: Attach Token for Backend Verification
-        params.append('token', localStorage.getItem('authToken'));
-
-        // --- Award Info ---
+        // --- 1. Prepare Data ---
+        // Rank
         let rank = document.getElementById('comp-rank').value;
         if (rank === 'other') {
             rank = document.getElementById('comp-rank-other').value;
         }
-        params.append('awardRank', rank);
 
-        params.append('competitionName', document.getElementById('comp-name').value);
-
-        // Level Mapping (Map key to Thai Text)
+        // Level
         const levelVal = document.querySelector('input[name="level"]:checked').value;
         const levelMap = {
             'school': 'ระดับโรงเรียน',
+            'district': 'ระดับอำเภอ',
             'area': 'ระดับเขตพื้นที่ฯ',
             'province': 'ระดับจังหวัด',
             'region': 'ระดับภาค',
             'nation': 'ระดับชาติ',
             'inter': 'ระดับนานาชาติ'
         };
-        params.append('awardLevel', levelMap[levelVal] || levelVal);
+        const awardLevel = levelMap[levelVal] || levelVal;
 
-        params.append('organizer', document.getElementById('comp-org').value);
-        params.append('awardDate', document.getElementById('comp-date').value);
+        // Department Logic (Multi-Select)
+        // Department Logic (Multi-Select) - Send as Array directly
+        // const deptGroup = selectedDeptGroups.join(', ');
+        // const workGroup = selectedWorkGroups.join(', ');
 
-        let dept = document.getElementById('comp-dept').value;
-        if (dept === 'other') {
-            dept = document.getElementById('comp-dept-other').value;
+        // --- 2. Process Files ---
+        const filesPayload = [];
+        if (currentFiles.cert) {
+            const base64 = await convertFileToBase64(currentFiles.cert);
+            filesPayload.push({
+                name: currentFiles.cert.name,
+                type: currentFiles.cert.type,
+                data: base64, // Extract base64 string
+                category: 'certificate'
+            });
         }
-        params.append('department', dept);
-        params.append('notes', '');
-        // Default status for new records: Not yet received reward
-        params.append('isGetReward', 'false');
-
-        // --- File Upload ---
-        if (uploadedFile) {
-            try {
-                const base64Data = await convertFileToBase64(uploadedFile);
-                params.append('fileName', uploadedFile.name);
-                params.append('fileType', uploadedFile.type);
-                params.append('fileData', base64Data);
-            } catch (fileErr) {
-                console.error("File Conversion Error", fileErr);
-                // Continue without file or throw? Let's warn but try to continue or throw?
-                // Better to fail if file was expected but failed
-                throw new Error("ไม่สามารถอ่านไฟล์ได้");
-            }
+        if (currentFiles.photo) {
+            const base64 = await convertFileToBase64(currentFiles.photo);
+            filesPayload.push({
+                name: currentFiles.photo.name,
+                type: currentFiles.photo.type,
+                data: base64,
+                category: 'photo'
+            });
         }
 
-        // --- Students ---
-        const stdList = students.map(s => ({
-            prefix: s.title,
-            name: s.firstname + ' ' + s.lastname,
-            grade: s.grade,
-            room: s.room
-        }));
-        params.append('students', JSON.stringify(stdList));
+        if (filesPayload.length === 0) {
+            throw new Error("กรุณาแนบไฟล์อย่างน้อย 1 รายการ");
+        }
 
-        // --- Teachers ---
-        const tchList = teachers.map(t => ({
-            prefix: t.title,
-            name: t.firstname + ' ' + t.lastname,
-            department: ''
-        }));
-        params.append('teachers', JSON.stringify(tchList));
+        // --- 3. Construct Payload ---
+        // Map data to match User Requirement exactly
+        const payload = {
+            "action": "save_award",
+            "token": localStorage.getItem('authToken'),
 
-        // 3. Send Data
+            // Mapped Columns
+            "awardRank": rank,
+            "competitionName": document.getElementById('comp-name').value,
+            "awardLevel": awardLevel,
+            "organizer": document.getElementById('comp-org').value,
+            "awardDate": document.getElementById('comp-date').value,
+
+            // User Specified Mapping
+            "onBehalfOf": selectedDeptGroups,   // Subject Group (Array)
+            "department": selectedWorkGroups,   // Work Group (Array)
+
+            "notes": "", // Optional field
+
+            // JSON Strings
+            "students": JSON.stringify(students.map(s => ({
+                prefix: s.title,
+                name: s.firstname + ' ' + s.lastname,
+                grade: s.grade,
+                room: s.room
+            }))),
+
+            "teachers": JSON.stringify(teachers.map(t => ({
+                prefix: t.title,
+                name: t.firstname + ' ' + t.lastname,
+                department: '' // Optional
+            }))),
+
+            "files": JSON.stringify(filesPayload)
+        };
+
+        console.log("PAYLOAD SENT TO API:", payload); // For debugging
+
+
+        // --- 4. Send Data ---
+        // Use FormData to send as POST body parameter 'data' (common GAS pattern)
+        // Or if backend expects raw JSON body, use JSON.stringify(payload) directly.
+        // Based on user snippet: "formData.append('data', JSON.stringify(payload))"
+        // Wait, normally `doPost(e)` reads `e.postData.contents`.
+        // But user provided snippet with FormData. I will stick to standard `JSON.stringify(payload)`
+        // unless I am sure. The `login` function sends JSON string body.
+        // Re-read user plan/snippet carefully.
+        // User said: "const payload = { ... }; ... fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })" in login.
+        // In plan I wrote: "Send payload as JSON string in body".
+        // The user snippet in plan for save_award was:
+        /*
+          const formData = new FormData();
+          formData.append('data', JSON.stringify(payload));
+          ... body: formData
+        */
+        // This implies they changed backend to read parameter 'data'?
+        // However, `login` function works with JSON body.
+        // I will trust the standard JSON body first as it's cleaner for GAS usually.
+        // But if user explicitly gave that snippet... I'll check `login` again.
+        // StartLine 75: body: JSON.stringify({ action: ... })
+        // If login works, save_award should work same way unless backend is different for file upload.
+        // The file data is INSIDE the JSON payload as string. So request size might be large.
+        // I will use JSON.stringify(payload) to be consistent with `login`.
+        // If it fails, I'll switch to FormData.
+
+        console.log("Sending Payload:", payload);
+
         const response = await fetch(API_URL, {
             method: 'POST',
-            body: params.toString(),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+            // headers: { "Content-Type": "application/json" }, // GAS doesn't like content-type header sometimes
+            body: JSON.stringify(payload)
         });
 
         const result = await response.json();
 
-        // 4. Hide Loading
+        // 5. Hide Loading
         loading.classList.add('invisible');
         loading.style.visibility = 'hidden';
 
-        // 5. Check Result
+        // 6. Check Result
         if (result.success) {
             Swal.fire({
                 title: 'บันทึกข้อมูลสำเร็จ',
@@ -1575,10 +2161,8 @@ async function submitForm() {
                 confirmButtonText: 'ตกลง',
                 confirmButtonColor: '#2563EB'
             }).then(() => {
-                resetForm();
-                switchView('dashboard');
-                // Optional: Refresh list if API supports immediate read, but usually there's delay/cache
-                // fetchAwards(); 
+            }).then(() => {
+                location.reload(); // Full refresh as requested
             });
         } else {
             throw new Error(result.error || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
@@ -1592,7 +2176,7 @@ async function submitForm() {
 
         Swal.fire({
             title: 'เกิดข้อผิดพลาด',
-            text: error.message || 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
+            text: error.message || 'ไม่สามารถบันทึกข้อมูลได้',
             icon: 'error',
             confirmButtonText: 'ตกลง',
             confirmButtonColor: '#2563EB'
@@ -1605,130 +2189,88 @@ function resetForm() {
     currentStep = 1;
     students = [];
     teachers = [];
-    uploadedFile = null;
-    clearFileUI();
+    selectedDeptGroups = [];
+    selectedWorkGroups = [];
+    currentFiles = { cert: null, photo: null };
+    clearFileUI('cert');
+    clearFileUI('photo');
     renderStudents();
     renderTeachers();
+    renderDeptGroups();
+    renderWorkGroups();
     updateWizardUI();
+
+    // Reset Work Group input (hidden)
+    document.getElementById('comp-work-other').classList.add('hidden');
+    document.querySelector('.file-upload-zone').classList.remove('has-file');
 }
 
-// --- FILE UPLOAD HANDLING ---
-let uploadedFile = null;
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+// --- FILE UPLOAD HANDLING (Multi-File) ---
+let currentFiles = { cert: null, photo: null };
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-function handleFileSelect(event) {
+function handleFileSelect(event, type) {
     const file = event.target.files[0];
     if (file) {
-        validateAndSetFile(file);
+        validateAndSetFile(file, type);
+
+        // Clear input value to allow re-selecting same file
+        event.target.value = '';
     }
 }
 
-function handleDragOver(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    document.getElementById('file-upload-zone').classList.add('drag-over');
-}
-
-function handleDragLeave(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    document.getElementById('file-upload-zone').classList.remove('drag-over');
-}
-
-function handleFileDrop(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    document.getElementById('file-upload-zone').classList.remove('drag-over');
-
-    const file = event.dataTransfer.files[0];
-    if (file) {
-        validateAndSetFile(file);
-    }
-}
-
-function validateAndSetFile(file) {
+function validateAndSetFile(file, type) {
     const errorEl = document.getElementById('file-error');
     errorEl.classList.add('hidden');
 
-    // Check file size (5MB limit)
     if (file.size > MAX_FILE_SIZE) {
-        errorEl.textContent = 'ไฟล์มีขนาดเกิน 5MB กรุณาเลือกไฟล์ที่มีขนาดเล็กกว่า';
-        errorEl.classList.remove('hidden');
         showToast('ไฟล์มีขนาดเกิน 5MB', 'error');
         return;
     }
 
-    // Check file type
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp',
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ];
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx'];
-
-    const ext = '.' + file.name.split('.').pop().toLowerCase();
-    const isValidType = allowedTypes.includes(file.type) || allowedExtensions.includes(ext);
-
-    if (!isValidType) {
-        errorEl.textContent = 'ประเภทไฟล์ไม่ถูกต้อง กรุณาใช้ไฟล์รูปภาพ, PDF หรือ Word';
-        errorEl.classList.remove('hidden');
-        showToast('ประเภทไฟล์ไม่ถูกต้อง', 'error');
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+        showToast('รองรับเฉพาะไฟล์รูปภาพและ PDF', 'error');
         return;
     }
 
-    // Valid file - store and show preview
-    uploadedFile = file;
-    showFilePreview(file);
-    showToast('อัปโหลดไฟล์หลักฐานเรียบร้อย', 'success');
+    // Set State
+    currentFiles[type] = file;
+    updateFileUI(type);
+    showToast('อัปโหลดไฟล์เรียบร้อย', 'success');
 }
 
-function showFilePreview(file) {
-    const zone = document.getElementById('file-upload-zone');
-    const placeholder = document.getElementById('file-upload-placeholder');
-    const preview = document.getElementById('file-upload-preview');
-    const fileName = document.getElementById('file-name');
-    const fileSize = document.getElementById('file-size');
+function updateFileUI(type) {
+    const placeholder = document.getElementById(`${type}-placeholder`);
+    const preview = document.getElementById(`${type}-preview`);
+    const nameEl = document.getElementById(`${type}-name`);
 
-    // Format file size
-    let sizeStr;
-    if (file.size < 1024) {
-        sizeStr = file.size + ' B';
-    } else if (file.size < 1024 * 1024) {
-        sizeStr = (file.size / 1024).toFixed(1) + ' KB';
+    if (currentFiles[type]) {
+        placeholder.classList.add('hidden');
+        preview.classList.remove('hidden');
+        preview.classList.add('flex');
+        nameEl.textContent = currentFiles[type].name;
     } else {
-        sizeStr = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+        placeholder.classList.remove('hidden');
+        preview.classList.add('hidden');
+        preview.classList.remove('flex');
     }
-
-    fileName.textContent = file.name;
-    fileSize.textContent = sizeStr;
-
-    placeholder.classList.add('hidden');
-    preview.classList.remove('hidden');
-    zone.classList.add('has-file');
-
-    lucide.createIcons();
 }
 
-function clearFile(event) {
-    event.stopPropagation();
-    uploadedFile = null;
-    document.getElementById('evidence-file').value = '';
-    clearFileUI();
-    showToast('ลบไฟล์หลักฐานแล้ว', 'info');
+function clearSpecificFile(event, type) {
+    if (event) event.stopPropagation();
+    currentFiles[type] = null;
+    updateFileUI(type);
 }
 
-function clearFileUI() {
-    const zone = document.getElementById('file-upload-zone');
-    const placeholder = document.getElementById('file-upload-placeholder');
-    const preview = document.getElementById('file-upload-preview');
-    const errorEl = document.getElementById('file-error');
-
-    if (placeholder) placeholder.classList.remove('hidden');
-    if (preview) preview.classList.add('hidden');
-    if (zone) zone.classList.remove('has-file');
-    if (errorEl) errorEl.classList.add('hidden');
-
-    lucide.createIcons();
+function clearFileUI(type) {
+    if (type) {
+        clearSpecificFile(null, type);
+    } else {
+        // Clear all
+        clearSpecificFile(null, 'cert');
+        clearSpecificFile(null, 'photo');
+    }
 }
 
 // --- PENDING REWARDS LOGIC (Features by User) ---
@@ -1877,22 +2419,73 @@ async function executeBulkAction(action) {
         confirmButtonText: confirmBtn,
         cancelButtonText: 'ยกเลิก',
         reverseButtons: true
-    }).then((result) => {
+    }).then(async (result) => {
         if (result.isConfirmed) {
-            // Process Action
-            selectedItems.forEach(index => {
-                if (groupedData[index]) {
-                    groupedData[index].isGetReward = true;
-                }
-            });
 
-            // Interaction Feedback
-            Swal.fire({
-                icon: 'success',
-                title: 'ดำเนินการสำเร็จ',
-                timer: 1500,
-                showConfirmButton: false
-            });
+            // Both receive and reject call the same mark_rewarded API
+            try {
+                const loading = document.getElementById('loading');
+                loading.classList.remove('invisible');
+                loading.style.visibility = 'visible';
+
+                const ids = [];
+                selectedItems.forEach(index => {
+                    if (groupedData[index] && groupedData[index].id) {
+                        ids.push(groupedData[index].id);
+                    }
+                });
+
+                const token = localStorage.getItem('authToken') || (appState.token || '');
+
+                const payload = {
+                    "action": "mark_rewarded",
+                    "token": token,
+                    "ids": ids
+                };
+
+                console.log(payload);
+
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                const resData = await response.json();
+
+                loading.classList.add('invisible');
+                loading.style.visibility = 'hidden';
+
+                if (resData.success) {
+                    // Update Local Data
+                    selectedItems.forEach(index => {
+                        if (groupedData[index]) {
+                            groupedData[index].isGetReward = true;
+                        }
+                    });
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'บันทึกสำเร็จ',
+                        text: action === 'receive' ? 'บันทึกการรับรางวัลเรียบร้อยแล้ว' : 'ซ่อนรายการเรียบร้อยแล้ว',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                } else {
+                    throw new Error(resData.error || 'Server returned error');
+                }
+
+            } catch (err) {
+                const loading = document.getElementById('loading');
+                loading.classList.add('invisible');
+                loading.style.visibility = 'hidden';
+                console.error(err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'ไม่สามารถบันทึกไปยังเซิร์ฟเวอร์ได้: ' + err.message
+                });
+                return; // Stop here
+            }
 
             // Reset & Refresh
             isSelectionMode = false;
@@ -1909,24 +2502,36 @@ function renderPendingRewards() {
 
     const query = document.getElementById('pending-search-input').value.toLowerCase();
 
-    // 1. Filter Data (isGetReward != true)
-    let pending = groupedData.filter(item => item.isGetReward !== true);
+    // 1. Filter Data (isGetReward != true AND Rank is not Participated)
+    // Exclude "เข้าร่วม" from pending rewards
+    let pending = groupedData.filter(item => {
+        const isNotReceived = item.isGetReward !== true;
+        const isNotParticipation = item.rank !== 'เข้าร่วม';
+        return isNotReceived && isNotParticipation;
+    });
 
     // 2. Search Filter
     if (query) {
         pending = pending.filter(item =>
-            item["Competition Name"].toLowerCase().includes(query) ||
-            item.students.some(s => (s.name || '').toLowerCase().includes(query))
+            (item.competition || '').toLowerCase().includes(query) ||
+            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
         );
     }
 
-    // 3. Group by Department
+    // 3. Group by Department (Subject Group)
     const groups = {};
     pending.forEach(item => {
-        let dept = item["Department"] || "อื่นๆ";
+        const deptGroups = toArray(item.onBehalfOf);
+        const workGroups = toArray(item.department);
+        let dept = '';
 
-        // Merge Science and SMTE (Unconditional)
-        if (dept === "กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี" || dept === "งานห้องเรียนพิเศษ smte") {
+        if (deptGroups.length > 0) dept = deptGroups.join(', ');
+        else if (workGroups.length > 0) dept = workGroups.join(', ');
+        else dept = "อื่นๆ";
+
+        // Merge Science and SMTE (Unconditional) - Optional based on previous logic
+        // Keeping it if user wants to group Science and SMTE together
+        if (dept === "กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี" || dept === "งานห้องเรียนพิเศษ SMTE") {
             dept = "ห้องเรียนพิเศษ SMTE กับ วิทยาศาสตร์";
         }
 
@@ -1973,7 +2578,7 @@ function renderPendingRewards() {
         // Header Row (Static) with Drag Handle
         tbody.innerHTML += `
             <tr class="bg-yellow-300 text-gray-800 font-bold border-b border-yellow-400 ignore-elements group-handle cursor-move hover:bg-yellow-400 transition">
-                <td colspan="6" class="px-4 py-2 text-center select-none relative">
+                <td colspan="7" class="px-4 py-2 text-center select-none relative">
                     <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100">
                         <i data-lucide="grip-vertical" class="w-5 h-5 text-gray-700"></i>
                     </div>
@@ -1986,8 +2591,8 @@ function renderPendingRewards() {
         // NOTE: If user drags, we are not persisting "manual order" in this variable permanently yet,
         // but Sortable will rearrange DOM. Re-rendering (e.g. search) will reset to this sort order.
         groups[dept].sort((a, b) => {
-            const weightA = getLevelWeight(a["Award Level"]) * 100 + getRankWeight(a["Award Rank"]);
-            const weightB = getLevelWeight(b["Award Level"]) * 100 + getRankWeight(b["Award Rank"]);
+            const weightA = getLevelWeight(a.level) * 100 + getRankWeight(a.rank);
+            const weightB = getLevelWeight(b.level) * 100 + getRankWeight(b.rank);
             return weightB - weightA;
         });
 
@@ -2022,29 +2627,40 @@ function renderPendingRewards() {
                          <div class="absolute left-1 top-3 opacity-0 group-hover:opacity-100 text-gray-400 cursor-move ${isSelectionMode ? 'hidden' : ''}" title="ลากเพื่อเปลี่ยนลำดับ">
                             <i data-lucide="grip-vertical" class="w-4 h-4"></i>
                         </div>
-                        <span class="ml-2">${item["Award Rank"]}</span>
+                        <span class="ml-2">${item.rank || '-'}</span>
                     </td>
                     
                     <!-- Competition -->
                     <td class="px-4 py-3">
-                        <div class="text-sm font-medium text-gray-900 leading-snug">${item["Competition Name"]}</div>
-                        <div class="text-xs text-gray-400 mt-1">${item["Award Date"] ? normalizeDate(item["Award Date"]).toLocaleDateString('th-TH', { dateStyle: 'long' }) : ''}</div>
+                        <div class="text-sm font-medium text-gray-900 leading-snug">${item.competition || '-'}</div>
+                        <div class="text-xs text-gray-400 mt-1">${item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'long' }) : ''}</div>
                     </td>
                     
                     <!-- Level -->
                     <td class="px-4 py-3 text-xs text-gray-600 font-medium">
-                        ${item["Award Level"]}
+                        ${item.level || '-'}
                     </td>
                     
                     <!-- Organizer -->
                     <td class="px-4 py-3 text-xs text-gray-600">
-                        ${item["Organizer"] || '-'}
+                        ${item.organizer || '-'}
                     </td>
                     
                     <!-- Students -->
                     <td class="px-4 py-3">
                         ${stdStr}
                     </td>
+
+                    <!-- Evidence (New) -->
+                    <td class="px-4 py-3 text-center">
+                        ${(item.fileUrls && (Array.isArray(item.fileUrls) ? item.fileUrls.length > 0 : item.fileUrls)) ?
+                    `<button onclick="event.stopPropagation(); ${Array.isArray(item.fileUrls) && item.fileUrls.length > 1 ? `openDetail(${globalIndex})` : `previewFile('${item.fileUrls[0] || item.fileUrls}')`}" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="ดูหลักฐาน">
+                                <i data-lucide="paperclip" class="w-4 h-4"></i>
+                            </button>` : '<span class="text-gray-300">-</span>'}
+                    </td>
+
+
+
                 </tr>
             `;
             tbody.innerHTML += rowStr;
@@ -2093,32 +2709,65 @@ function markAsReceived(index, type) {
         customClass: {
             cancelButton: 'text-gray-600'
         }
-    }).then((result) => {
+    }).then(async (result) => {
         if (result.isConfirmed) {
-            // Update Local Data
-            if (groupedData[index]) {
-                groupedData[index].isGetReward = true;
-            }
 
-            // Re-render
-            renderPendingRewards();
+            // If it's single item receive, we need to call API
+            if (type === 'receive' || type !== 'reject') {
+                try {
+                    const loading = document.getElementById('loading');
+                    loading.classList.remove('invisible');
+                    loading.style.visibility = 'visible';
 
-            const Toast = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 2000,
-                timerProgressBar: true,
-                didOpen: (toast) => {
-                    toast.addEventListener('mouseenter', Swal.stopTimer)
-                    toast.addEventListener('mouseleave', Swal.resumeTimer)
+                    const payload = {
+                        "action": "mark_rewarded",
+                        "token": localStorage.getItem('auth_token') || (appState.user ? appState.token : ''),
+                        "ids": [groupedData[index].id]
+                    };
+
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+
+                    const resData = await response.json();
+
+                    loading.classList.add('invisible');
+                    loading.style.visibility = 'hidden';
+
+                    if (resData.success) {
+                        if (groupedData[index]) {
+                            groupedData[index].isGetReward = true;
+                        }
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'บันทึกสำเร็จ',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+                        renderPendingRewards();
+                    } else {
+                        throw new Error(resData.error || 'Server error');
+                    }
+                } catch (e) {
+                    const loading = document.getElementById('loading');
+                    loading.classList.add('invisible');
+                    loading.style.visibility = 'hidden';
+                    Swal.fire('Error', e.message, 'error');
                 }
-            })
-
-            Toast.fire({
-                icon: 'success',
-                title: 'อัปเดตสถานะเรียบร้อย'
-            })
+            } else {
+                // Reject
+                if (groupedData[index]) {
+                    groupedData[index].isGetReward = true;
+                }
+                renderPendingRewards();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'อัปเดตสถานะเรียบร้อย',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+            }
         }
     });
 }
@@ -2127,205 +2776,180 @@ function printPendingRewards() {
     window.print();
 }
 
-// --- SUBJECT GROUP SUMMARY LOGIC (Feature #Phase10) ---
-let currentSubjectFilter = 'ทั้งหมด';
-let subjectData = [];
-
-function renderSubjectSummary() {
-    // 1. Prepare Data
-    const allItems = groupedData; // Use the grouped data source
-
-    // 2. Render Filters (Chips)
-    renderSubjectFilters();
-
-    // 3. Filter & Sort Initial Data
-    filterSubjectData();
+// openDetailFromSummary - opens the detail modal from subject summary view
+function openDetailFromSummary(index) {
+    if (index >= 0 && index < groupedData.length) {
+        populateDetail(groupedData[index]);
+        openModal('detail-modal');
+    }
 }
 
-function renderSubjectFilters() {
-    // 1. Mobile Container (Horizontal Scroll)
-    const mobileContainer = document.getElementById('subject-scroll-container');
-    // 2. Desktop Sidebar Container (Vertical List)
-    const desktopContainer = document.getElementById('sidebar-filter-list');
+function openDetail(index) {
+    openDetailFromSummary(index);
+}
 
-    // Extract Groups
-    const groups = new Set(groupedData.map(d => d["Department"] || "ไม่ระบุ"));
-    const sortedGroups = Array.from(groups).sort();
+function populateDetail(item) {
+    // Basic Info
+    document.getElementById('detail-title').innerText = item.competition || '-';
+    document.getElementById('detail-date').innerText = item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'long' }) : '-';
 
-    // Render Mobile (Dropdown)
-    if (mobileContainer) {
-        let htmlMobile = `
-                    <div class="relative">
-                        <select onchange="switchGroup(this.value)" 
-                            class="w-full appearance-none pl-4 pr-10 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
-                            <option value="ทั้งหมด" ${currentSubjectFilter === 'ทั้งหมด' ? 'selected' : ''}>ทั้งหมด</option>
-                `;
+    document.getElementById('detail-rank-badge').innerText = item.rank || 'รางวัล';
+    document.getElementById('detail-level-badge').innerText = item.level || 'ระดับ';
 
-        sortedGroups.forEach(group => {
-            const isSelected = currentSubjectFilter === group ? 'selected' : '';
-            htmlMobile += `<option value="${group}" ${isSelected}>${group}</option>`;
-        });
+    // Organization Info Cards
+    // Organization Info Cards - Multi-Select Chips
+    const onBehalfOf = toArray(item.onBehalfOf);
+    const deptContainer = document.getElementById('detail-subject-group');
+    if (onBehalfOf.length > 0) {
+        deptContainer.innerHTML = `<div class="flex flex-wrap gap-1 mt-1">
+            ${onBehalfOf.map(d => `<span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-semibold">${d}</span>`).join('')}
+        </div>`;
+    } else {
+        deptContainer.innerText = '-';
+    }
 
-        htmlMobile += `
-                        </select>
-                        <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"></i>
+    document.getElementById('detail-organizer').innerText = item.organizer || '-';
+
+    // Work Group (กลุ่มงาน) - hide card if empty
+    const workGroupCard = document.getElementById('detail-work-group-card');
+    const works = toArray(item.department);
+
+    if (works.length > 0) {
+        const workContainer = document.getElementById('detail-work-group');
+        workContainer.innerHTML = `<div class="flex flex-wrap gap-1 mt-1">
+            ${works.map(w => `<span class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-semibold">${w}</span>`).join('')}
+        </div>`;
+        workGroupCard.classList.remove('hidden');
+    } else {
+        workGroupCard.classList.add('hidden');
+    }
+
+    // Students
+    const stdList = document.getElementById('detail-std-list');
+    const students = item.students || [];
+    document.getElementById('detail-std-count').innerText = students.length;
+
+    if (students.length > 0) {
+        stdList.innerHTML = students.map(s => `
+            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">
+                        ${(s.name || '?').charAt(0)}
                     </div>
-                `;
-        mobileContainer.innerHTML = htmlMobile;
-        lucide.createIcons();
-    }
-
-    // Render Desktop (Vertical List)
-    if (desktopContainer) {
-        let htmlDesktop = `
-                    <button onclick="switchGroup('ทั้งหมด')" 
-                        class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-between ${currentSubjectFilter === 'ทั้งหมด' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}">
-                        <span>ทั้งหมด</span>
-                        ${currentSubjectFilter === 'ทั้งหมด' ? '<i data-lucide="check" class="w-4 h-4"></i>' : ''}
-                    </button>
-                `;
-        sortedGroups.forEach(group => {
-            const isActive = currentSubjectFilter === group;
-            htmlDesktop += `
-                        <button onclick="switchGroup('${group}')" 
-                            class="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-between ${isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}">
-                            <span>${group}</span>
-                            ${isActive ? '<i data-lucide="check" class="w-4 h-4"></i>' : ''}
-                        </button>
-                    `;
-        });
-        desktopContainer.innerHTML = htmlDesktop;
-        lucide.createIcons();
-    }
-}
-
-function switchGroup(group) {
-    currentSubjectFilter = group;
-    renderSubjectFilters(); // Re-render to update active state
-    filterSubjectData();
-    // Scroll to top of list
-    // document.getElementById('view-subject-summary').scrollTo(0,0);
-}
-
-function handleSubjectSearch() {
-    filterSubjectData();
-}
-
-function filterSubjectData() {
-    const query = document.getElementById('subject-search-input').value.toLowerCase();
-
-    // Filter by Group
-    let filtered = groupedData;
-    if (currentSubjectFilter !== 'ทั้งหมด') {
-        filtered = filtered.filter(item => item["Department"] === currentSubjectFilter);
-    }
-
-    // Filter by Search
-    if (query) {
-        filtered = filtered.filter(item => item["Competition Name"].toLowerCase().includes(query));
-    }
-
-    // Sort by Priority Weight (Level > Rank)
-    filtered.sort((a, b) => {
-        const weightA = getPriorityWeight(a["Award Level"], a["Award Rank"]);
-        const weightB = getPriorityWeight(b["Award Level"], b["Award Rank"]);
-        return weightB - weightA; // Descending
-    });
-
-    subjectData = filtered;
-    renderSubjectStats();
-    renderSubjectList();
-}
-
-function renderSubjectStats() {
-    // Reset counts
-    let inter = 0;
-    let nation = 0;
-    let region = 0;
-
-    subjectData.forEach(item => {
-        const l = normalizeLevel(item["Award Level"]);
-        if (l === 'international') inter++;
-        else if (l === 'nation') nation++;
-        else if (l === 'region') region++;
-    });
-
-    // Animate Numbers (Simple text update)
-    if (document.getElementById('stat-summary-total')) document.getElementById('stat-summary-total').innerText = subjectData.length;
-    if (document.getElementById('stat-inter')) document.getElementById('stat-inter').innerText = inter;
-    if (document.getElementById('stat-nation')) document.getElementById('stat-nation').innerText = nation;
-    if (document.getElementById('stat-region')) document.getElementById('stat-region').innerText = region;
-}
-
-function renderSubjectList() {
-    const container = document.getElementById('subject-result-list');
-
-    if (subjectData.length === 0) {
-        container.innerHTML = `<div class="text-center py-10 text-gray-400 text-sm">ไม่พบข้อมูล</div>`;
-        return;
-    }
-
-    container.innerHTML = subjectData.map((item, index) => {
-        // Rank Styling
-        let rankClass = "bg-blue-100 text-blue-800";
-        const r = item["Award Rank"] || "";
-        if (r.includes("ชนะเลิศ") || r.includes("ทอง")) rankClass = "bg-yellow-100 text-yellow-800";
-        else if (r.includes("เงิน")) rankClass = "bg-gray-100 text-gray-700";
-        else if (r.includes("ทองแดง")) rankClass = "bg-orange-100 text-orange-800";
-        else if (r.includes("ชมเชย")) rankClass = "bg-teal-100 text-teal-800";
-
-        // Level Label
-        let levelLabel = "ระดับโรงเรียน/อื่นๆ";
-        let levelColor = "text-gray-500";
-        const l = normalizeLevel(item["Award Level"]);
-
-        if (l === 'international') {
-            levelLabel = "ระดับนานาชาติ";
-            levelColor = "text-purple-600 font-bold";
-        } else if (l === 'nation') {
-            levelLabel = "ระดับชาติ";
-            levelColor = "text-red-600 font-bold";
-        } else if (l === 'region') {
-            levelLabel = "ระดับภาค";
-            levelColor = "text-orange-600 font-semibold";
-        } else if (l === 'province') {
-            levelLabel = "ระดับจังหวัด";
-            levelColor = "text-blue-600";
-        } else if (l === 'area') {
-            levelLabel = "ระดับเขตพื้นที่ฯ";
-            levelColor = "text-blue-600";
-        }
-
-        return `
-                <div onclick="openDetailFromSummary(${groupedData.indexOf(item)})" class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-start gap-3 active:scale-[0.98] transition cursor-pointer hover:border-blue-300 hover:shadow-md group">
-                    <div class="flex-shrink-0 mt-1">
-                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${rankClass}">
-                            ${r.substring(0, 2)}
-                        </div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-800 dark:text-gray-200">${s.prefix || ''}${s.name}</p>
+                        <p class="text-[10px] text-gray-500">${s.grade} / ${s.room}</p>
                     </div>
-                    <div class="flex-grow min-w-0">
-                        <div class="flex justify-between items-start">
-                            <h4 class="font-bold text-gray-800 text-sm line-clamp-2 leading-tight group-hover:text-blue-600 transition">${item["Competition Name"]}</h4>
-                        </div>
-                        <div class="flex items-center gap-2 mt-1">
-                            <i data-lucide="award" class="w-3 h-3 ${levelColor}"></i>
-                            <span class="text-xs ${levelColor}">${levelLabel}</span>
-                        </div>
-                        <div class="flex items-center gap-2 mt-2">
-                             <span class="px-2 py-0.5 rounded-md bg-gray-50 text-gray-500 text-[10px] border border-gray-100">
-                                ${item["Award Rank"]}
-                            </span>
-                            <span class="text-[10px] text-gray-400">
-                                ${item["Department"]}
-                            </span>
-                        </div>
-                    </div>
-                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-300 self-center group-hover:text-blue-500 group-hover:translate-x-1 transition"></i>
                 </div>
-                `;
-    }).join('');
+            </div>
+        `).join('');
+    } else {
+        stdList.innerHTML = `<p class="text-xs text-gray-400 italic">ไม่มีข้อมูล</p>`;
+    }
 
+    // Teachers
+    const tchList = document.getElementById('detail-tch-list');
+    const teachers = item.teachers || [];
+    document.getElementById('detail-tch-count').innerText = teachers.length;
+
+    if (teachers.length > 0) {
+        tchList.innerHTML = teachers.map(t => `
+            <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px] font-bold">
+                        ${(t.name || '?').charAt(0)}
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-800 dark:text-gray-200">${t.name}</p>
+                        <p class="text-[10px] text-gray-500">ครูที่ปรึกษา</p>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        tchList.innerHTML = `<p class="text-xs text-gray-400 italic">ไม่มีข้อมูล</p>`;
+    }
+
+    // Evidence / Files
+    const evidenceActions = document.getElementById('evidence-actions');
+    const noLink = document.getElementById('detail-no-link');
+
+    // Check fileUrls (Array or String)
+    let files = [];
+    if (item.fileUrls) {
+        if (Array.isArray(item.fileUrls)) files = item.fileUrls;
+        else if (item.fileUrls) files = [item.fileUrls];
+    }
+
+    if (files.length > 0) {
+        evidenceActions.classList.remove('hidden');
+        evidenceActions.style.display = 'block'; // Make sure block to contain list
+        evidenceActions.innerHTML = ''; // Clear previous
+
+        files.forEach((url, idx) => {
+            const isImageOrPdf = url.match(/\.(jpeg|jpg|gif|png|pdf)$/i) != null;
+            const isGoogleDrive = url.includes('drive.google.com') || url.includes('docs.google.com');
+            const canPreview = isImageOrPdf || isGoogleDrive;
+
+            const fileName = `ไฟล์แนบ ${idx + 1}`;
+
+            const div = document.createElement('div');
+            div.className = "flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-800 rounded-lg mb-2 last:mb-0 border border-gray-100 dark:border-slate-700";
+            div.innerHTML = `
+                <div class="flex items-center gap-2 min-w-0">
+                    <i data-lucide="file-text" class="w-4 h-4 text-gray-400 shrink-0"></i>
+                    <span class="text-xs text-gray-700 dark:text-gray-300 truncate" title="${url}">${fileName}</span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button onclick="previewFile('${url}')" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition ${canPreview ? '' : 'hidden'}" title="ดูตัวอย่าง">
+                        <i data-lucide="eye" class="w-4 h-4"></i>
+                    </button>
+                    <a href="${url}" target="_blank" class="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition" title="ดาวน์โหลด/เปิด">
+                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                    </a>
+                </div>
+            `;
+            evidenceActions.appendChild(div);
+        });
+
+        noLink.classList.add('hidden');
+    } else {
+        evidenceActions.classList.add('hidden');
+        noLink.classList.remove('hidden');
+    }
+
+    // Reset Preview
+    document.getElementById('preview-container').classList.add('hidden');
     lucide.createIcons();
+}
+
+function previewFile(url) {
+    const container = document.getElementById('preview-container');
+    const frame = document.getElementById('preview-frame');
+
+    // Google Drive Embed Fix
+    if (url.includes('drive.google.com') && url.includes('/view')) {
+        url = url.replace('/view', '/preview');
+    }
+
+    frame.src = url;
+    container.classList.remove('hidden');
+}
+
+function closePreview() {
+    document.getElementById('preview-container').classList.add('hidden');
+    document.getElementById('preview-frame').src = '';
+}
+
+function formatTimestamp(ts) {
+    if (!ts) return '-';
+    // TS format from Google: Usually ISO string
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('th-TH', {
+        day: 'numeric', month: 'short', year: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+    });
 }
 
 const roomSelect = document.getElementById('std-room');
