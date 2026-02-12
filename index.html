@@ -102,15 +102,15 @@
                     <i data-lucide="trophy" class="w-5 h-5"></i>
                     <span>ผลงานทั้งหมด</span>
                 </button>
-                <button onclick="switchView('form'); toggleDrawer()"
-                    class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                    <span>เพิ่มข้อมูลใหม่</span>
-                </button>
                 <button onclick="switchView('subject-summary'); toggleDrawer()"
                     class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
                     <i data-lucide="pie-chart" class="w-5 h-5"></i>
                     <span>สรุปตามกลุ่มสาระฯ</span>
+                </button>
+                <button onclick="switchView('form'); toggleDrawer()"
+                    class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    <span>เพิ่มข้อมูลใหม่</span>
                 </button>
                 <button onclick="switchView('pending-rewards'); toggleDrawer()"
                     class="w-full text-left px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-blue-50 hover:text-blue-600 text-gray-600 transition">
@@ -150,17 +150,17 @@
                         class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
                     ผลงานทั้งหมด
                 </button>
-                <button onclick="switchView('form')" id="sidebar-form"
-                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
-                    <i data-lucide="plus-circle"
-                        class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
-                    เพิ่มข้อมูลใหม่
-                </button>
                 <button onclick="switchView('subject-summary')" id="sidebar-subject"
                     class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
                     <i data-lucide="pie-chart"
                         class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
                     สรุปตามกลุ่มสาระฯ
+                </button>
+                <button onclick="switchView('form')" id="sidebar-form"
+                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
+                    <i data-lucide="plus-circle"
+                        class="w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+                    เพิ่มข้อมูลใหม่
                 </button>
                 <button onclick="switchView('pending-rewards')" id="sidebar-pending"
                     class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group">
@@ -301,7 +301,7 @@
                                     <i data-lucide="users" class="w-16 h-16 text-purple-600 dark:text-purple-500"></i>
                                 </div>
                                 <p class="text-xs font-bold text-purple-500 uppercase tracking-wider mb-2">
-                                    อันดับผลงานของครูผู้ฝึกซ้อม</p>
+                                    ผลงานของครูผู้ฝึกซ้อม 10 อันดับแรก</p>
                                 <div class="flex items-center gap-2">
                                     <p class="text-sm font-bold text-purple-900 dark:text-white leading-none">ดูข้อมูล
                                     </p>
@@ -318,7 +318,7 @@
                                         class="w-16 h-16 text-orange-600 dark:text-orange-500"></i>
                                 </div>
                                 <p class="text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">
-                                    อันดับผลงานของแต่ละกลุ่มสาระ</p>
+                                    ผลงานของแต่ละกลุ่มสาระ 10 อันดับแรก</p>
                                 <div class="flex items-center gap-2">
                                     <p class="text-sm font-bold text-orange-900 dark:text-white leading-none">ดูข้อมูล
                                     </p>
@@ -389,67 +389,89 @@
                                     </div>
 
                                     <!-- Department & Work Group (Multi-Select Lists) -->
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 xl:col-span-2">
-                                        <!-- กลุ่มสาระ Multi-Select -->
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">กลุ่มสาระฯ
-                                                <span class="text-red-500">*</span></label>
-                                            <div class="flex flex-col sm:flex-row gap-2">
-                                                <select id="comp-dept-group"
-                                                    class="flex-1 w-full min-w-0 max-w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition cursor-pointer text-sm font-medium truncate">
-                                                    <option value="">-- เลือกกลุ่มสาระ --</option>
-                                                    <option value="ไม่มีกลุ่มสาระ">ไม่มีกลุ่มสาระ</option>
-                                                    <option>กลุ่มสาระการเรียนรู้คณิตศาสตร์</option>
-                                                    <option>กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี</option>
-                                                    <option>กลุ่มสาระการเรียนรู้ภาษาไทย</option>
-                                                    <option>กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ</option>
-                                                    <option>กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนาและวัฒนธรรม</option>
-                                                    <option>กลุ่มสาระการเรียนรู้สุขศึกษา พลศึกษา</option>
-                                                    <option>กลุ่มสาระการเรียนรู้ศิลปะ</option>
-                                                    <option>กลุ่มสาระการเรียนรู้การงานอาชีพ</option>
-                                                </select>
-                                                <button type="button" onclick="addDeptGroup()"
-                                                    class="px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition shrink-0 flex items-center justify-center gap-1 sm:justify-start">
-                                                    <i data-lucide="plus" class="w-4 h-4"></i>
-                                                    เพิ่ม +
-                                                </button>
-                                            </div>
-                                            <div id="dept-group-list" class="mt-2 space-y-1">
-                                                <!-- Dynamic chips render here -->
+                                    <div class="xl:col-span-2 space-y-4">
+                                        <h3 class="font-bold text-gray-800 border-b pb-2 mb-2">ส่งรางวัลในนาม <span
+                                                class="text-sm font-normal text-gray-500">(สามารถระบุได้มากกว่า
+                                                1)</span></h3>
+
+                                        <!-- Clarification Alert -->
+                                        <div class="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-r-lg mb-4">
+                                            <div class="flex items-start">
+                                                <div class="flex-shrink-0">
+                                                    <i data-lucide="info" class="h-4 w-4 text-blue-500 mt-0.5"></i>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <p class="text-sm text-blue-700">
+                                                        กรุณาระบุกลุ่มสาระฯ หรือกิจกรรมที่
+                                                        <strong>รับผิดชอบผลงานนี้</strong> <br class="sm:hidden">
+                                                        (ไม่ใช่กลุ่มสาระฯ ที่ท่านสังกัด)
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <!-- กลุ่มงาน Multi-Select -->
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 mb-1">กลุ่มงาน /
-                                                กิจกรรม
-                                                <span class="text-red-500">*</span></label>
-                                            <div class="flex flex-col sm:flex-row gap-2">
-                                                <select id="comp-dept-work"
-                                                    class="flex-1 w-full min-w-0 max-w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition cursor-pointer text-sm font-medium truncate">
-                                                    <option value="">-- เลือกกลุ่มงาน --</option>
-                                                    <option value="ไม่มีกลุ่มงาน">ไม่มีกลุ่มงาน</option>
-                                                    <option>งานแนะแนว</option>
-                                                    <option>งานเทคโนโลยี</option>
-                                                    <option>กิจกรรมพัฒนาผู้เรียน (ลูกเสือ)</option>
-                                                    <option>งานห้องเรียนพิเศษ SMTE</option>
-                                                    <option>งานสภานักเรียน</option>
-                                                    <option>งานห้องสมุด</option>
-                                                    <option>งานห้องเรียนสีเขียว</option>
-                                                    <option>งาน to be number one</option>
-                                                    <option value="other">อื่นๆ (ระบุ)</option>
-                                                </select>
-                                                <button type="button" onclick="addWorkGroup()"
-                                                    class="px-4 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition shrink-0 flex items-center justify-center gap-1 sm:justify-start">
-                                                    <i data-lucide="plus" class="w-4 h-4"></i>
-                                                    เพิ่ม
-                                                </button>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <!-- กลุ่มสาระ Multi-Select -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">กลุ่มสาระฯ
+                                                    <span class="text-red-500">*</span></label>
+                                                <div class="flex flex-col sm:flex-row gap-2">
+                                                    <select id="comp-dept-group"
+                                                        class="flex-1 w-full min-w-0 max-w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition cursor-pointer text-sm font-medium truncate">
+                                                        <option value="">-- เลือกกลุ่มสาระ --</option>
+                                                        <option value="ไม่มีกลุ่มสาระ">ไม่มีกลุ่มสาระ</option>
+                                                        <option>กลุ่มสาระการเรียนรู้คณิตศาสตร์</option>
+                                                        <option>กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี</option>
+                                                        <option>กลุ่มสาระการเรียนรู้ภาษาไทย</option>
+                                                        <option>กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ</option>
+                                                        <option>กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนาและวัฒนธรรม</option>
+                                                        <option>กลุ่มสาระการเรียนรู้สุขศึกษา พลศึกษา</option>
+                                                        <option>กลุ่มสาระการเรียนรู้ศิลปะ</option>
+                                                        <option>กลุ่มสาระการเรียนรู้การงานอาชีพ</option>
+                                                    </select>
+                                                    <button type="button" onclick="addDeptGroup()"
+                                                        class="px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-sm font-bold transition shrink-0 flex items-center justify-center gap-1 sm:justify-start">
+                                                        <i data-lucide="plus" class="w-4 h-4"></i>
+                                                        กดเพื่อเพิ่ม
+                                                    </button>
+                                                </div>
+                                                <div id="dept-group-list" class="mt-2 space-y-1">
+                                                    <!-- Dynamic chips render here -->
+                                                </div>
                                             </div>
-                                            <input type="text" id="comp-work-other"
-                                                class="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-100 outline-none hidden fade-in text-sm"
-                                                placeholder="พิมพ์ชื่อกลุ่มงาน แล้วกดเพิ่ม...">
-                                            <div id="dept-work-list" class="mt-2 space-y-1">
-                                                <!-- Dynamic chips render here -->
+
+                                            <!-- กลุ่มงาน Multi-Select -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">กลุ่มงาน /
+                                                    กิจกรรม
+                                                    <span class="text-red-500">*</span></label>
+                                                <div class="flex flex-col sm:flex-row gap-2">
+                                                    <select id="comp-dept-work"
+                                                        class="flex-1 w-full min-w-0 max-w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition cursor-pointer text-sm font-medium truncate">
+                                                        <option value="">-- เลือกกลุ่มงาน --</option>
+                                                        <option value="ไม่มีกลุ่มงาน">ไม่มีกลุ่มงาน</option>
+                                                        <option>งานแนะแนว</option>
+                                                        <option>งานเทคโนโลยี</option>
+                                                        <option>กิจกรรมพัฒนาผู้เรียน (ลูกเสือ)</option>
+                                                        <option>งานห้องเรียนพิเศษ SMTE</option>
+                                                        <option>งานสภานักเรียน</option>
+                                                        <option>งานห้องสมุด</option>
+                                                        <option>งานห้องเรียนสีเขียว</option>
+                                                        <option>งาน to be number one</option>
+                                                        <option value="other">อื่นๆ (ระบุ)</option>
+                                                    </select>
+                                                    <button type="button" onclick="addWorkGroup()"
+                                                        class="px-4 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl text-sm font-bold transition shrink-0 flex items-center justify-center gap-1 sm:justify-start">
+                                                        <i data-lucide="plus" class="w-4 h-4"></i>
+                                                        กดเพื่อเพิ่ม
+                                                    </button>
+                                                </div>
+                                                <input type="text" id="comp-work-other"
+                                                    class="mt-2 w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-blue-100 outline-none hidden fade-in text-sm"
+                                                    placeholder="พิมพ์ชื่อกลุ่มงาน แล้วกดเพิ่ม...">
+                                                <div id="dept-work-list" class="mt-2 space-y-1">
+                                                    <!-- Dynamic chips render here -->
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -629,7 +651,7 @@
                                                 <!-- Example Image 2 -->
                                                 <div class="mt-2 text-center">
                                                     <p class="text-xs text-gray-400 mb-1">ตัวอย่างรูปกิจกรรม:</p>
-                                                    <img src="" alt="ตัวอย่างรูปกิจกรรม"
+                                                    <img src="assets/example_activity.jpg" alt="ตัวอย่างรูปกิจกรรม"
                                                         class="w-full h-auto rounded-lg border border-gray-200 object-cover bg-gray-50 min-h-[150px]">
                                                 </div>
                                             </div>
@@ -702,6 +724,23 @@
                                 <h2 class="text-xl font-bold mb-1">ตรวจสอบข้อมูล</h2>
                                 <p class="text-gray-500 mb-6 text-sm">กรุณาตรวจสอบความถูกต้องก่อนบันทึก</p>
 
+                                <!-- Warning Alert -->
+                                <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg mb-6">
+                                    <div class="flex">
+                                        <div class="flex-shrink-0">
+                                            <i data-lucide="alert-triangle" class="h-5 w-5 text-orange-400"></i>
+                                        </div>
+                                        <div class="ml-3">
+                                            <h3 class="text-sm font-bold text-orange-800">กรุณาตรวจสอบความถูกต้อง</h3>
+                                            <div class="mt-2 text-sm text-orange-700 space-y-1">
+                                                <p>1. ตรวจสอบว่า <strong>"ส่งรางวัลในนาม"</strong> ถูกต้อง
+                                                    (ระบุกลุ่มสาระฯ ที่รับผิดชอบผลงาน)</p>
+                                                <p>2. เมื่อบันทึกแล้ว <strong>จะไม่สามารถแก้ไขข้อมูลได้</strong></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div class="space-y-6">
                                     <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-100">
                                         <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -726,6 +765,7 @@
                                                 <p class="font-semibold text-gray-800" id="summary-comp-date">-</p>
                                             </div>
                                             <div class="md:col-span-2">
+                                                <p class="text-gray-400 text-xs mb-1">ส่งรางวัลในนาม</p>
                                                 <p class="text-gray-400 text-xs mb-1">กลุ่มสาระฯ/งาน</p>
                                                 <p class="font-semibold text-gray-800" id="summary-comp-dept">-</p>
                                             </div>
@@ -1198,8 +1238,11 @@
                         <option>นางสาว</option>
                         <option>ว่าที่ร้อยตรี</option>
                         <option>ดร.</option>
-                        <option>อื่น ๆ</option>
+                        <option value="other">อื่น ๆ (ระบุ)</option>
                     </select>
+                    <input type="text" id="tch-title-other"
+                        class="mt-2 w-full px-3 py-3 rounded-lg border border-gray-200 bg-gray-50 outline-none hidden fade-in text-sm"
+                        placeholder="ระบุคำนำหน้าชื่อ...">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>

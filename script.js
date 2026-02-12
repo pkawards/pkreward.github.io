@@ -540,6 +540,7 @@ function showDeptStats() {
     })).sort((a, b) => b.count - a.count);
 
     // 3. Generate HTML
+    const top10 = sortedDepts.slice(0, 10);
     const html = `
         <div class="text-left">
             <div class="overflow-hidden rounded-xl border border-gray-100 dark:border-slate-700">
@@ -552,7 +553,7 @@ function showDeptStats() {
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
-                        ${sortedDepts.map((d, i) => `
+                        ${top10.map((d, i) => `
                             <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                 <td class="px-4 py-3 font-bold text-gray-400 w-12 text-center">#${i + 1}</td>
                                 <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">${d.name}</td>
@@ -567,7 +568,7 @@ function showDeptStats() {
 
     // 4. Show Modal
     Swal.fire({
-        title: 'อันดับกลุ่มสาระฯ',
+        title: 'อันดับกลุ่มสาระฯ (Top 10)',
         html: html,
         width: 600,
         confirmButtonText: 'ปิด',
@@ -648,6 +649,9 @@ function renderSubjectSummary() {
 
             if (uniqueDepts.size > 0) {
                 uniqueDepts.forEach(d => {
+                    // Fix: If a specific filter is active, only add to that group
+                    if (activeSubjectFilter !== 'all' && d !== activeSubjectFilter) return;
+
                     if (!groups[d]) groups[d] = [];
                     // Avoid duplicate item in same group (unlikely here as we iterate items)
                     if (!groups[d].includes(item)) groups[d].push(item);
@@ -1783,7 +1787,22 @@ function openTeacherModal(index = -1) {
 
     if (index !== -1) {
         const t = teachers[index];
-        document.getElementById('tch-title').value = t.title;
+
+        // Handle Title
+        const titleSelect = document.getElementById('tch-title');
+        const titleOther = document.getElementById('tch-title-other');
+        const standardTitles = Array.from(titleSelect.options).map(o => o.value).filter(v => v !== 'other');
+
+        if (standardTitles.includes(t.title)) {
+            titleSelect.value = t.title;
+            titleOther.classList.add('hidden');
+            titleOther.value = '';
+        } else {
+            titleSelect.value = 'other';
+            titleOther.value = t.title;
+            titleOther.classList.remove('hidden');
+        }
+
         document.getElementById('tch-firstname').value = t.firstname;
         document.getElementById('tch-lastname').value = t.lastname;
 
@@ -1807,6 +1826,9 @@ function openTeacherModal(index = -1) {
         submitBtn.innerText = 'บันทึกการแก้ไข';
     } else {
         document.getElementById('tch-title').value = 'นาย';
+        document.getElementById('tch-title-other').classList.add('hidden');
+        document.getElementById('tch-title-other').value = '';
+
         document.getElementById('tch-firstname').value = '';
         document.getElementById('tch-lastname').value = '';
         document.getElementById('tch-dept').value = '';
@@ -1819,8 +1841,24 @@ function openTeacherModal(index = -1) {
     openModal('teacher-modal');
 }
 
+// Add Event Listener for Title Change
+document.getElementById('tch-title')?.addEventListener('change', function (e) {
+    const otherInput = document.getElementById('tch-title-other');
+    if (e.target.value === 'other') {
+        otherInput.classList.remove('hidden');
+        otherInput.focus();
+    } else {
+        otherInput.classList.add('hidden');
+        otherInput.value = '';
+    }
+});
+
 function saveTeacher() {
-    const title = document.getElementById('tch-title').value;
+    const titleSelect = document.getElementById('tch-title');
+    let title = titleSelect.value;
+    if (title === 'other') {
+        title = document.getElementById('tch-title-other').value.trim();
+    }
     const firstname = document.getElementById('tch-firstname').value;
     const lastname = document.getElementById('tch-lastname').value;
 
@@ -1831,6 +1869,7 @@ function saveTeacher() {
         department = document.getElementById('tch-dept-other').value.trim();
     }
 
+    if (!title) return showToast('กรุณาระบุคำนำหน้าชื่อ', 'warning');
     if (!firstname || !lastname) return showToast('กรุณากรอกชื่อและนามสกุล', 'warning');
     if (!department) return showToast('กรุณาระบุกลุ่มสาระฯ', 'warning');
 
