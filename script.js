@@ -2,7 +2,7 @@
 lucide.createIcons();
 //old = https://script.google.com/macros/s/AKfycbziZFKakpzfrVgu-V6YwwfIk--TIaHlLc6sIsZD4s84e1i1Y6VxByF80RrLx5ZGCPtnhg/exec
 // --- CONSTANTS ---
-const API_URL = "https://script.google.com/macros/s/AKfycbxwozY67uTbUjxaAqkm_PTLrODAYspDrdEPJAOMIa82177CsrWC8WSURIOYfcxrHDjeqw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwD59z8jBsYjPb0_rwRhyosBTXblyRb6lT2LnXcAiiucSgIJtVBrMn6Mh1ZIU8VpL4E-w/exec";
 const ITEMS_PER_PAGE = 50;
 
 // --- APP STATE ---
