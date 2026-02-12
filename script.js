@@ -2,7 +2,7 @@
 lucide.createIcons();
 //old = https://script.google.com/macros/s/AKfycbziZFKakpzfrVgu-V6YwwfIk--TIaHlLc6sIsZD4s84e1i1Y6VxByF80RrLx5ZGCPtnhg/exec
 // --- CONSTANTS ---
-const API_URL = "https://script.google.com/macros/s/AKfycbwD59z8jBsYjPb0_rwRhyosBTXblyRb6lT2LnXcAiiucSgIJtVBrMn6Mh1ZIU8VpL4E-w/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbynQNSmnMp-HFV53QskSMZPp76XO9ZlHQomvXqElMy-nREf1G6mxK3JMeiS44nHSeJdTg/exec";
 const ITEMS_PER_PAGE = 50;
 
 // --- APP STATE ---
@@ -510,26 +510,26 @@ function showDeptStats() {
     // 1. Aggregate Stats
     // 1. Aggregate Stats
     groupedData.forEach(item => {
-        // Use Subject Group (onBehalfOf) as primary, fallback to Work Group
-        const groups = toArray(item.onBehalfOf);
-
-        if (groups.length > 0) {
-            groups.forEach(g => {
-                if (!deptStats[g]) deptStats[g] = 0;
-                deptStats[g]++;
+        // Use Teacher's Department
+        const teachers = item.teachers || [];
+        if (teachers.length > 0) {
+            const uniqueDepts = new Set();
+            teachers.forEach(t => {
+                if (t.department) uniqueDepts.add(t.department);
             });
-        } else {
-            // Fallback to Work Group if no Subject Group
-            const works = toArray(item.department);
-            if (works.length > 0) {
-                works.forEach(w => {
-                    if (!deptStats[w]) deptStats[w] = 0;
-                    deptStats[w]++;
+
+            if (uniqueDepts.size > 0) {
+                uniqueDepts.forEach(d => {
+                    if (!deptStats[d]) deptStats[d] = 0;
+                    deptStats[d]++;
                 });
             } else {
                 if (!deptStats['ไม่ระบุ']) deptStats['ไม่ระบุ'] = 0;
                 deptStats['ไม่ระบุ']++;
             }
+        } else {
+            if (!deptStats['ไม่ระบุ']) deptStats['ไม่ระบุ'] = 0;
+            deptStats['ไม่ระบุ']++;
         }
     });
 
@@ -587,10 +587,9 @@ function renderSubjectSummary() {
 
     if (activeSubjectFilter !== 'all') {
         filtered = filtered.filter(item => {
-            const groups = toArray(item.onBehalfOf);
-            const works = toArray(item.department);
-            // Match if activeFilter is present in either array
-            return groups.includes(activeSubjectFilter) || works.includes(activeSubjectFilter);
+            const teachers = item.teachers || [];
+            // Match if activeFilter is present in teachers department
+            return teachers.some(t => t.department === activeSubjectFilter);
         });
     }
 
@@ -598,8 +597,7 @@ function renderSubjectSummary() {
     if (query) {
         filtered = filtered.filter(item =>
             (item.competition || '').toLowerCase().includes(query) ||
-            (item.onBehalfOf || '').toLowerCase().includes(query) ||
-            (item.department || '').toLowerCase().includes(query) ||
+            (item.teachers || []).some(t => (t.department || '').toLowerCase().includes(query)) ||
             (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
         );
     }
@@ -635,37 +633,32 @@ function renderSubjectSummary() {
         return;
     }
 
-    // Group by subject for display
+    // Group by Teacher Department for display
     const groups = {};
     filtered.forEach(item => {
-        const deptGroups = toArray(item.onBehalfOf);
-        const workGroups = toArray(item.department);
-
+        const teachers = item.teachers || [];
         let hasGroup = false;
 
-        // Add to all relevant Subject Groups
-        deptGroups.forEach(d => {
-            if (!groups[d]) groups[d] = [];
-            groups[d].push(item);
-            hasGroup = true;
-        });
+        // Add to all relevant Teacher Departments
+        if (teachers.length > 0) {
+            const uniqueDepts = new Set();
+            teachers.forEach(t => {
+                if (t.department) uniqueDepts.add(t.department);
+            });
 
-        // If no Subject Groups, try Work Groups? 
-        // Or should we list under Work Groups too? User req: "Subject and Work groups"
-        // Let's list under Work Groups ONLY if no Subject Group (to avoid clutter?) 
-        // OR list under ALL? 
-        // Current logic in renderSubjectFilters prioritized Subject Group.
-        // Let's allow listing under Work Groups too if they exist.
-        workGroups.forEach(w => {
-            if (!groups[w]) groups[w] = [];
-            // Avoid adding same item twice to same group (unlikely but safe)
-            if (!groups[w].includes(item)) groups[w].push(item);
-            hasGroup = true;
-        });
+            if (uniqueDepts.size > 0) {
+                uniqueDepts.forEach(d => {
+                    if (!groups[d]) groups[d] = [];
+                    // Avoid duplicate item in same group (unlikely here as we iterate items)
+                    if (!groups[d].includes(item)) groups[d].push(item);
+                    hasGroup = true;
+                });
+            }
+        }
 
         if (!hasGroup) {
-            if (!groups['อื่นๆ']) groups['อื่นๆ'] = [];
-            groups['อื่นๆ'].push(item);
+            if (!groups['ไม่ระบุ']) groups['ไม่ระบุ'] = [];
+            groups['ไม่ระบุ'].push(item);
         }
     });
 
@@ -732,16 +725,20 @@ function renderSubjectSummary() {
 
 function renderSubjectFilters() {
     // Collect unique subject groups
-    // Collect unique subject groups & work groups
+    // Collect unique teacher departments
     const deptSet = new Set();
     groupedData.forEach(item => {
-        const groups = toArray(item.onBehalfOf);
-        const works = toArray(item.department);
+        const teachers = item.teachers || [];
+        let hasDept = false;
 
-        groups.forEach(g => deptSet.add(g));
-        works.forEach(w => deptSet.add(w));
+        teachers.forEach(t => {
+            if (t.department) {
+                deptSet.add(t.department);
+                hasDept = true;
+            }
+        });
 
-        if (groups.length === 0 && works.length === 0) deptSet.add('อื่นๆ');
+        if (!hasDept) deptSet.add('ไม่ระบุ');
     });
 
     const departments = [...deptSet].sort();
@@ -761,11 +758,13 @@ function renderSubjectFilters() {
 
         departments.forEach(dept => {
             const isActive = activeSubjectFilter === dept;
-            // Count items that have this dept in their arrays
+            // Count items that have this dept in their teachers
             const count = groupedData.filter(i => {
-                const groups = toArray(i.onBehalfOf);
-                const works = toArray(i.department);
-                return groups.includes(dept) || works.includes(dept);
+                const teachers = i.teachers || [];
+                if (dept === 'ไม่ระบุ') {
+                    return teachers.length === 0 || !teachers.some(t => t.department);
+                }
+                return teachers.some(t => t.department === dept);
             }).length;
 
             const safeDept = dept.replace(/'/g, "\\'");
@@ -788,7 +787,11 @@ function renderSubjectFilters() {
         let options = `<option value="all" ${activeSubjectFilter === 'all' ? 'selected' : ''}>ทุกกลุ่มสาระฯ (${groupedData.length})</option>`;
 
         departments.forEach(dept => {
-            const count = groupedData.filter(i => (i.onBehalfOf || i.department || 'อื่นๆ') === dept).length;
+            // Count items that have this dept in their teachers
+            const count = groupedData.filter(i => {
+                return (i.teachers || []).some(t => (t.department || 'ไม่ระบุ') === dept);
+            }).length;
+
             const isSelected = activeSubjectFilter === dept ? 'selected' : '';
             options += `<option value="${dept}" ${isSelected}>${dept} (${count})</option>`;
         });
@@ -1107,7 +1110,7 @@ function populateDetailModal(item) {
                             <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-500">${char}</div>
                             <div>
                                 <p class="text-sm font-bold text-gray-800">${t.prefix || ''}${t.name || '-'}</p>
-                                <p class="text-xs text-gray-500">ครูที่ปรึกษา</p>
+                                <p class="text-xs text-gray-500 group-hover:text-blue-600 transition">${t.department}</p>
                             </div>
                         </div>
                     </div>
@@ -1603,6 +1606,22 @@ function setupFormListeners() {
             }
         });
     }
+
+    // Teacher Department Toggle
+    const tchDeptEl = document.getElementById('tch-dept');
+    if (tchDeptEl) {
+        tchDeptEl.addEventListener('change', function () {
+            const isOther = this.value === 'other';
+            const otherInput = document.getElementById('tch-dept-other');
+            if (isOther) {
+                otherInput.classList.remove('hidden');
+                otherInput.focus();
+            } else {
+                otherInput.classList.add('hidden');
+                otherInput.value = ''; // Reset value
+            }
+        });
+    }
 }
 
 // Initialize Listeners
@@ -1698,7 +1717,15 @@ function saveStudent() {
 function renderStudents() {
     const container = document.getElementById('student-list');
     if (students.length === 0) {
-        container.innerHTML = `<div class="text-center py-8 bg-gray-50 rounded-xl border border-gray-200 border-dashed"><p class="text-gray-400 text-sm">ยังไม่มีรายชื่อนักเรียน</p></div>`;
+        container.innerHTML = `
+            <div onclick="openStudentModal(-1)" class="text-center py-8 bg-gray-50 hover:bg-blue-50 cursor-pointer rounded-xl border-2 border-dashed border-gray-200 hover:border-blue-300 transition group">
+                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition">
+                    <i data-lucide="user-plus" class="w-6 h-6 text-gray-300 group-hover:text-blue-500 transition"></i>
+                </div>
+                <p class="text-gray-400 text-sm group-hover:text-blue-600 font-medium transition">ยังไม่มีรายชื่อนักเรียน</p>
+                <p class="text-xs text-gray-300 group-hover:text-blue-400 mt-1 transition">คลิกเพื่อเพิ่มรายชื่อ</p>
+            </div>`;
+        lucide.createIcons();
         return;
     }
     container.innerHTML = students.map((s, idx) => `
@@ -1760,12 +1787,31 @@ function openTeacherModal(index = -1) {
         document.getElementById('tch-firstname').value = t.firstname;
         document.getElementById('tch-lastname').value = t.lastname;
 
+        // Handle department
+        const deptSelect = document.getElementById('tch-dept');
+        const deptOther = document.getElementById('tch-dept-other');
+
+        // Check if value exists in standard options
+        const options = Array.from(deptSelect.options).map(o => o.value);
+        if (options.includes(t.department)) {
+            deptSelect.value = t.department;
+            deptOther.classList.add('hidden');
+            deptOther.value = '';
+        } else {
+            deptSelect.value = 'other';
+            deptOther.value = t.department;
+            deptOther.classList.remove('hidden');
+        }
+
         modalTitle.innerText = 'แก้ไขข้อมูลครู';
         submitBtn.innerText = 'บันทึกการแก้ไข';
     } else {
         document.getElementById('tch-title').value = 'นาย';
         document.getElementById('tch-firstname').value = '';
         document.getElementById('tch-lastname').value = '';
+        document.getElementById('tch-dept').value = '';
+        document.getElementById('tch-dept-other').value = '';
+        document.getElementById('tch-dept-other').classList.add('hidden');
 
         modalTitle.innerText = 'เพิ่มข้อมูลครู';
         submitBtn.innerText = 'ยืนยัน';
@@ -1778,12 +1824,21 @@ function saveTeacher() {
     const firstname = document.getElementById('tch-firstname').value;
     const lastname = document.getElementById('tch-lastname').value;
 
+    // Department Logic
+    const deptSelect = document.getElementById('tch-dept');
+    let department = deptSelect.value;
+    if (department === 'other') {
+        department = document.getElementById('tch-dept-other').value.trim();
+    }
+
     if (!firstname || !lastname) return showToast('กรุณากรอกชื่อและนามสกุล', 'warning');
+    if (!department) return showToast('กรุณาระบุกลุ่มสาระฯ', 'warning');
 
     const teacherData = {
         title,
         firstname,
-        lastname
+        lastname,
+        department
     };
 
     if (editingTeacherIndex !== -1) {
@@ -1803,9 +1858,19 @@ function saveTeacher() {
 function renderTeachers() {
     const container = document.getElementById('teacher-list');
     if (teachers.length === 0) {
-        container.innerHTML = `<div class="text-center py-8 bg-gray-50 rounded-xl border border-gray-200 border-dashed"><p class="text-gray-400 text-sm">ยังไม่มีรายชื่อครู</p></div>`;
+        container.innerHTML = `
+            <div onclick="openTeacherModal(-1)" class="text-center py-8 bg-gray-50 hover:bg-green-50 cursor-pointer rounded-xl border-2 border-dashed border-gray-200 hover:border-green-300 transition group">
+                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm group-hover:scale-110 transition">
+                    <i data-lucide="user-plus" class="w-6 h-6 text-gray-300 group-hover:text-green-500 transition"></i>
+                </div>
+                <p class="text-gray-400 text-sm group-hover:text-green-600 font-medium transition">ยังไม่มีรายชื่อครู</p>
+                <p class="text-xs text-gray-300 group-hover:text-green-400 mt-1 transition">คลิกเพื่อเพิ่มรายชื่อ</p>
+            </div>`;
+        lucide.createIcons();
         return;
     }
+
+    console.log(teachers);
     container.innerHTML = teachers.map((t, idx) => `
                 <div class="bg-white p-3 rounded-lg border border-gray-100 shadow-sm flex justify-between items-center group" data-id="${idx}">
                     <div class="flex items-center gap-3">
@@ -1817,7 +1882,8 @@ function renderTeachers() {
                         </div>
                         <div>
                             <h4 class="font-bold text-sm text-gray-800">${t.title}${t.firstname} ${t.lastname}</h4>
-                            <p class="text-xs text-gray-500">ครูที่ปรึกษา</p>
+                            <p class="text-xs text-gray-500">${t.department || '-'}</p>
+                        </div>
                         </div>
                     </div>
                      <div class="flex items-center gap-1">
@@ -1942,7 +2008,7 @@ function renderSummary() {
                             </div>
                             <div>
                                 <p class="text-sm font-bold text-gray-800">${t.title}${t.firstname} ${t.lastname}</p>
-                                <p class="text-xs text-gray-500">ครูที่ปรึกษา</p>
+                                <p class="text-xs text-gray-500">${t.department}</p>
                             </div>
                         </div>
                     </div>
@@ -2103,7 +2169,7 @@ async function saveAward() {
             "teachers": JSON.stringify(teachers.map(t => ({
                 prefix: t.title,
                 name: t.firstname + ' ' + t.lastname,
-                department: '' // Optional
+                department: t.department // Updated to include department
             }))),
 
             "files": JSON.stringify(filesPayload)
@@ -2651,10 +2717,20 @@ function renderPendingRewards() {
                         ${stdStr}
                     </td>
 
+                    <!-- Teacher (New) -->
+                    <td class="px-4 py-3">
+                        ${(item.teachers || []).map(t => `
+                            <div class="flex flex-col text-xs py-1 border-b border-dashed border-gray-100 last:border-0">
+                                <span class="font-medium text-gray-700">${t.prefix || ''}${t.name}</span> 
+                                <span class="text-[10px] text-gray-400 group-hover:text-blue-500 transition">${t.department || 'ครูที่ปรึกษา'}</span>
+                            </div>
+                        `).join('')}
+                    </td>
+
                     <!-- Evidence (New) -->
                     <td class="px-4 py-3 text-center">
                         ${(item.fileUrls && (Array.isArray(item.fileUrls) ? item.fileUrls.length > 0 : item.fileUrls)) ?
-                    `<button onclick="event.stopPropagation(); ${Array.isArray(item.fileUrls) && item.fileUrls.length > 1 ? `openDetail(${globalIndex})` : `previewFile('${item.fileUrls[0] || item.fileUrls}')`}" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="ดูหลักฐาน">
+                    `<button onclick="event.stopPropagation(); ${Array.isArray(item.fileUrls) && item.fileUrls.length > 1 ? `openDetailFromSummary(${globalIndex})` : `previewFile('${item.fileUrls[0] || item.fileUrls}')`}" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="ดูหลักฐาน">
                                 <i data-lucide="paperclip" class="w-4 h-4"></i>
                             </button>` : '<span class="text-gray-300">-</span>'}
                     </td>
@@ -2860,8 +2936,9 @@ function populateDetail(item) {
                         ${(t.name || '?').charAt(0)}
                     </div>
                     <div>
-                        <p class="text-xs font-bold text-gray-800 dark:text-gray-200">${t.name}</p>
+                        <p class="text-xs font-bold text-gray-800 dark:text-gray-200">${t.prefix || ''}${t.name}</p>
                         <p class="text-[10px] text-gray-500">ครูที่ปรึกษา</p>
+                        <p class="text-xs text-gray-500 group-hover:text-blue-600 transition">${t.department}</p>
                     </div>
                 </div>
             </div>
@@ -2959,3 +3036,28 @@ for (let i = 1; i <= 15; i++) {
     opt.innerText = i;
     roomSelect.appendChild(opt);
 }
+
+// --- DATE INPUT AUTO-CORRECTION (Feature #14) ---
+document.getElementById('comp-date')?.addEventListener('change', function (e) {
+    const val = e.target.value;
+    if (!val) return;
+
+    const date = new Date(val);
+    const year = date.getFullYear();
+
+    // If year is in Buddhist Era range (e.g., > 2400), subtract 543
+    if (year > 2400) {
+        date.setFullYear(year - 543);
+        e.target.value = date.toISOString().split('T')[0];
+
+        // Optional: Notify user
+        Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: 'แปลงปี พ.ศ. เป็น ค.ศ. อัตโนมัติ',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    }
+});
