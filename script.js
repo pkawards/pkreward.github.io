@@ -2312,7 +2312,7 @@ function resetForm() {
 
 // --- FILE UPLOAD HANDLING (Multi-File) ---
 let currentFiles = { cert: null, photo: null };
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
 
 function handleFileSelect(event, type) {
     const file = event.target.files[0];
@@ -2329,7 +2329,7 @@ function validateAndSetFile(file, type) {
     errorEl.classList.add('hidden');
 
     if (file.size > MAX_FILE_SIZE) {
-        showToast('ไฟล์มีขนาดเกิน 5MB', 'error');
+        showToast('ไฟล์มีขนาดเกิน 30MB', 'error');
         return;
     }
 
