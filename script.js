@@ -137,6 +137,56 @@ async function doLogin() {
     }
 }
 
+async function doResetPassword() {
+    const username = document.getElementById('forgot-username').value.trim();
+    const btn = document.getElementById('btn-forgot-submit');
+
+    if (!username) return showToast('กรุณากรอกชื่อผู้ใช้งาน', 'warning');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> กำลังดำเนินการ...';
+    lucide.createIcons();
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'reset_password',
+                username: username
+            })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            closeModal('forgot-password-modal');
+            Swal.fire({
+                icon: 'success',
+                title: 'รีเซ็ตรหัสผ่านสำเร็จ',
+                text: result.message || 'รหัสผ่านถูกรีเซ็ตเรียบร้อยแล้ว',
+                confirmButtonText: 'ตกลง'
+            });
+            document.getElementById('forgot-username').value = '';
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'ไม่สำเร็จ',
+                text: result.message || 'ไม่พบชื่อผู้ใช้งานนี้ในระบบ'
+            });
+        }
+    } catch (error) {
+        console.error('Reset Password Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'เกิดข้อผิดพลาด',
+            text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'
+        });
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>รีเซ็ตรหัสผ่าน</span><i data-lucide="send" class="w-4 h-4"></i>';
+        lucide.createIcons();
+    }
+}
+
 function logout() {
     localStorage.removeItem('authToken');
 
@@ -221,7 +271,7 @@ function updateAuthUI() {
             else if (role === 'Student') roleLabel = 'นักเรียน';
 
             desktopUserInfo.innerHTML = `
-                <div class="flex items-center gap-3 p-2 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700">
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-gray-100 dark:border-slate-700 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition group" onclick="switchView('my-awards')">
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
                         ${initial}
                     </div>
@@ -229,9 +279,11 @@ function updateAuthUI() {
                         <p class="text-sm font-bold text-gray-800 dark:text-gray-200 truncate">${name}</p>
                         <p class="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">${roleLabel}</p>
                     </div>
-                    <button onclick="logout()" class="p-1.5 text-gray-400 hover:text-red-500 transition rounded-lg hover:bg-red-50" title="ออกจากระบบ">
-                        <i data-lucide="log-out" class="w-4 h-4"></i>
-                    </button>
+                    <div class="flex items-center gap-1">
+                        <button onclick="event.stopPropagation(); logout()" class="p-1.5 text-gray-400 hover:text-red-500 transition rounded-lg hover:bg-red-50" title="ออกจากระบบ">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
             `;
             desktopUserInfo.classList.remove('hidden');
@@ -242,7 +294,7 @@ function updateAuthUI() {
     }
 
     // Lock/Unlock Menu Items (Visuals)
-    const lockedItems = ['sidebar-form', 'sidebar-pending'];
+    const lockedItems = ['sidebar-form', 'sidebar-pending', 'sidebar-my-awards'];
     lockedItems.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -360,22 +412,28 @@ function sortAwards(data, criteria) {
 
 function getRankWeight(rank) {
     if (!rank) return 0;
-    if (rank.includes("ชนะเลิศ") && !rank.includes("รอง")) return 10;
-    if (rank.includes("เหรียญทอง")) return 9;
-    if (rank.includes("เหรียญเงิน") || rank.includes("รองชนะเลิศอันดับ 1")) return 8;
-    if (rank.includes("เหรียญทองแดง") || rank.includes("รองชนะเลิศอันดับ 2")) return 7;
-    if (rank.includes("ชมเชย")) return 6;
-    if (rank.includes("เข้าร่วม")) return 5;
+    // P1: Gold Tier
+    if ((rank.includes("ชนะเลิศ") && !rank.includes("รอง")) || rank.includes("เหรียญทอง")) return 5;
+    // P2: Silver Tier
+    if (rank.includes("รองชนะเลิศอันดับที่ 1") || rank.includes("รองชนะเลิศอันดับ 1") || rank.includes("เหรียญเงิน")) return 4;
+    // P3: Bronze Tier
+    if (rank.includes("รองชนะเลิศอันดับที่ 2") || rank.includes("รองชนะเลิศอันดับ 2") || rank.includes("เหรียญทองแดง")) return 3;
+    // P4: Honorable Tier
+    if (rank.includes("รองชนะเลิศอันดับที่ 3") || rank.includes("รองชนะเลิศอันดับ 3") || rank.includes("ชมเชย")) return 2;
+    // P5: Entry Tier
+    if (rank.includes("เข้าร่วม")) return 1;
     return 0;
 }
 
 function getLevelWeight(level) {
     if (!level) return 0;
-    if (level.includes("นานาชาติ")) return 5;
-    if (level.includes("ประเทศ")) return 4;
-    if (level.includes("ภาค")) return 3;
-    if (level.includes("เขต")) return 2;
-    return 1;
+    if (level.includes("นานาชาติ")) return 7;
+    if (level.includes("ประเทศ") || level.includes("ชาติ")) return 6;
+    if (level.includes("ภาค")) return 5;
+    if (level.includes("จังหวัด")) return 4;
+    if (level.includes("เขต")) return 3;
+    if (level.includes("อำเภอ")) return 2;
+    return 1; // โรงเรียน
 }
 
 function handleSearch() {
@@ -932,27 +990,7 @@ function renderAwards() {
 }
 
 // --- DETAIL MODAL LOGIC (Cleaned up) ---
-function getRankWeight(rank) {
-    if (!rank) return 0;
-    const r = rank.toLowerCase();
-    if (r.includes("ชนะเลิศ") || r.includes("เหรียญทอง")) return 5;
-    if (r.includes("รองชนะเลิศอันดับ 1") || r.includes("เหรียญเงิน")) return 4;
-    if (r.includes("รองชนะเลิศอันดับ 2") || r.includes("เหรียญทองแดง")) return 3;
-    if (r.includes("ชมเชย")) return 2;
-    if (r.includes("เข้าร่วม")) return 1;
-    return 0;
-}
-
-function getLevelWeight(level) {
-    if (!level) return 0;
-    const l = level.toLowerCase();
-    if (l.includes("นานาชาติ")) return 5;
-    if (l.includes("ประเทศ")) return 4;
-    if (l.includes("ภาค")) return 3;
-    if (l.includes("เขต")) return 2;
-    if (l.includes("จังหวัด") || l.includes("อำเภอ")) return 1;
-    return 0;
-}
+// getRankWeight and getLevelWeight are already defined above (lines ~361, ~376)
 
 function openDetail(index) {
     const item = filteredData[index];
@@ -1175,7 +1213,7 @@ function toggleDrawer() {
 // --- WIZARD SWITCHING & LOGIC ---
 function switchView(viewName) {
     // Auth Guard
-    if (viewName === 'form' || viewName === 'pending-rewards') {
+    if (viewName === 'form' || viewName === 'pending-rewards' || viewName === 'my-awards') {
         if (!checkAuth()) return;
 
         // Role Guard (Server Validated)
@@ -1197,6 +1235,7 @@ function switchView(viewName) {
     const form = document.getElementById('view-form');
     const subjectSummary = document.getElementById('view-subject-summary');
     const pendingRewards = document.getElementById('view-pending-rewards');
+    const myAwards = document.getElementById('view-my-awards');
     const wizardProgress = document.getElementById('wizard-progress');
 
     // Reset Views
@@ -1204,6 +1243,7 @@ function switchView(viewName) {
     form.classList.add('hidden');
     subjectSummary.classList.add('hidden');
     pendingRewards.classList.add('hidden');
+    if (myAwards) myAwards.classList.add('hidden');
     wizardProgress.classList.add('hidden');
 
     if (viewName === 'dashboard') {
@@ -1217,6 +1257,9 @@ function switchView(viewName) {
     } else if (viewName === 'pending-rewards') {
         pendingRewards.classList.remove('hidden');
         renderPendingRewards();
+    } else if (viewName === 'my-awards') {
+        if (myAwards) myAwards.classList.remove('hidden');
+        renderMyAwards();
     }
 
     // Update Sidebar Active States
@@ -1237,7 +1280,8 @@ function updateSidebarActiveState(activeView) {
         'dashboard': 'sidebar-dashboard',
         'form': 'sidebar-form',
         'subject-summary': 'sidebar-subject',
-        'pending-rewards': 'sidebar-pending'
+        'pending-rewards': 'sidebar-pending',
+        'my-awards': 'sidebar-my-awards'
     };
 
     Object.values(map).forEach(id => {
@@ -1301,12 +1345,14 @@ function addDeptGroup() {
     }
     sel.value = '';
     renderDeptGroups();
+    autoSaveForm();
     showToast('เพิ่มกลุ่มสาระแล้ว', 'success');
 }
 
 function removeDeptGroup(idx) {
     selectedDeptGroups.splice(idx, 1);
     renderDeptGroups();
+    autoSaveForm();
 }
 
 function renderDeptGroups() {
@@ -1331,6 +1377,20 @@ function renderDeptGroups() {
 }
 
 // --- MULTI-SELECT: กลุ่มงาน ---
+function handleWorkGroupChange() {
+    const sel = document.getElementById('comp-dept-work');
+    const otherContainer = document.getElementById('work-other-container');
+    if (sel.value === 'other') {
+        otherContainer.classList.remove('hidden');
+        otherContainer.classList.add('flex');
+        document.getElementById('comp-work-other').focus();
+        return;
+    }
+    otherContainer.classList.add('hidden');
+    otherContainer.classList.remove('flex');
+    if (sel.value) addWorkGroup();
+}
+
 function addWorkGroup() {
     const sel = document.getElementById('comp-dept-work');
     let val = sel.value;
@@ -1341,6 +1401,9 @@ function addWorkGroup() {
         val = otherInput.value.trim();
         if (!val) { showToast('กรุณาพิมพ์ชื่อกลุ่มงาน', 'error'); return; }
         otherInput.value = '';
+        const otherContainer = document.getElementById('work-other-container');
+        otherContainer.classList.add('hidden');
+        otherContainer.classList.remove('flex');
     }
 
     if (!val) { showToast('กรุณาเลือกกลุ่มงานก่อน', 'error'); return; }
@@ -1351,18 +1414,20 @@ function addWorkGroup() {
     } else {
         selectedWorkGroups = selectedWorkGroups.filter(d => d !== 'ไม่มีกลุ่มงาน');
         if (selectedWorkGroups.includes(val)) {
-            showToast('เพิ่มกลุ่มงานนี้ไปแล้ว', 'error'); return;
+            showToast('เพิ่มกลุ่มงานนี้ไปแล้ว', 'error'); sel.value = ''; return;
         }
         selectedWorkGroups.push(val);
     }
     sel.value = '';
     renderWorkGroups();
+    autoSaveForm();
     showToast('เพิ่มกลุ่มงานแล้ว', 'success');
 }
 
 function removeWorkGroup(idx) {
     selectedWorkGroups.splice(idx, 1);
     renderWorkGroups();
+    autoSaveForm();
 }
 
 function renderWorkGroups() {
@@ -1396,6 +1461,7 @@ function normalizeLevel(levelRaw) {
     if (s.includes('region') || s.includes('ภาค')) return 'region';
     if (s.includes('province') || s.includes('จังหวัด')) return 'province';
     if (s.includes('area') || s.includes('เขต')) return 'area';
+    if (s.includes('district') || s.includes('อำเภอ')) return 'district';
 
     return 'school';
 }
@@ -1406,26 +1472,19 @@ function getPriorityWeight(levelRaw, rank) {
     const level = normalizeLevel(levelRaw);
     let levelWeight = 0;
 
-    // Map Standardized Level to Score
-    if (level === 'international') levelWeight = 5;
-    else if (level === 'nation') levelWeight = 4;
-    else if (level === 'region') levelWeight = 3;
-    else if (level === 'province' || level === 'area') levelWeight = 2;
+    // Map Standardized Level to Score (นานาชาติ > ชาติ > ภาค > จังหวัด > เขตพื้นที่ > อำเภอ > โรงเรียน)
+    if (level === 'international') levelWeight = 7;
+    else if (level === 'nation') levelWeight = 6;
+    else if (level === 'region') levelWeight = 5;
+    else if (level === 'province') levelWeight = 4;
+    else if (level === 'area') levelWeight = 3;
+    else if (level === 'district') levelWeight = 2;
     else levelWeight = 1; // School/Other
 
-    let rankWeight = 0;
-    // Map Rank to Score
-    if (rank.includes('ชนะเลิศ')) rankWeight = 10;
-    else if (rank.includes('รองชนะเลิศอันดับที่ 1')) rankWeight = 9;
-    else if (rank.includes('รองชนะเลิศอันดับที่ 2')) rankWeight = 8;
-    else if (rank.includes('รองชนะเลิศอันดับที่ 3')) rankWeight = 7;
-    else if (rank.includes('เหรียญทอง')) rankWeight = 8.5; // Gold is high
-    else if (rank.includes('เหรียญเงิน')) rankWeight = 6;
-    else if (rank.includes('เหรียญทองแดง')) rankWeight = 4;
-    else if (rank.includes('ชมเชย')) rankWeight = 2;
-    else if (rank.includes('เข้าร่วม')) rankWeight = 1;
+    // P1-P5 Rank Tier
+    const rankWeight = getRankWeight(rank);
 
-    return (levelWeight * 1000) + rankWeight;
+    return (levelWeight * 100) + rankWeight;
 }
 
 function updateWizardUI() {
@@ -1470,21 +1529,21 @@ function changeStep(direction) {
 
         // 1. Validate Competition Name
         if (!nameEl.value.trim()) {
-            showError(nameEl);
+            showError(nameEl, 'err-comp-name');
             isValid = false;
             if (!firstInvalid) firstInvalid = nameEl;
         }
 
         // 2. Validate Organizer
         if (!orgEl.value.trim()) {
-            showError(orgEl);
+            showError(orgEl, 'err-comp-org');
             isValid = false;
             if (!firstInvalid) firstInvalid = orgEl;
         }
 
         // 3. Validate Date
         if (!dateEl.value) {
-            showError(dateEl);
+            showError(dateEl, 'err-comp-date');
             isValid = false;
             if (!firstInvalid) firstInvalid = dateEl;
         }
@@ -1500,7 +1559,7 @@ function changeStep(direction) {
 
         // 5. Validate Rank
         if (!rankEl.value) {
-            showError(rankEl);
+            showError(rankEl, 'err-comp-rank');
             isValid = false;
             if (!firstInvalid) firstInvalid = rankEl;
         } else if (rankEl.value === 'other') {
@@ -1558,15 +1617,26 @@ function changeStep(direction) {
     }
 }
 
-function showError(el) {
+function showError(el, hintId) {
     el.classList.add('border-red-500', 'ring-2', 'ring-red-100', 'animate-shake');
-    el.addEventListener('input', () => clearError(el), {
+    if (hintId) {
+        const hint = document.getElementById(hintId);
+        if (hint) hint.classList.remove('hidden');
+    }
+    el.addEventListener('input', () => clearError(el, hintId), {
+        once: true
+    });
+    el.addEventListener('change', () => clearError(el, hintId), {
         once: true
     });
 }
 
-function clearError(el) {
+function clearError(el, hintId) {
     el.classList.remove('border-red-500', 'ring-2', 'ring-red-100', 'animate-shake');
+    if (hintId) {
+        const hint = document.getElementById(hintId);
+        if (hint) hint.classList.add('hidden');
+    }
 }
 
 function clearErrors() {
@@ -1576,6 +1646,8 @@ function clearErrors() {
             el.classList.remove('border', 'rounded-xl', 'p-1', 'bg-red-50/50');
         }
     });
+    // Hide all inline error hints
+    document.querySelectorAll('[id^="err-"]').forEach(hint => hint.classList.add('hidden'));
 }
 
 function setupFormListeners() {
@@ -1629,7 +1701,11 @@ function setupFormListeners() {
 }
 
 // Initialize Listeners
-document.addEventListener('DOMContentLoaded', setupFormListeners);
+document.addEventListener('DOMContentLoaded', () => {
+    setupFormListeners();
+    initAutoSave();
+    restoreFormDraft();
+});
 
 function openModal(id) {
     const modal = document.getElementById(id);
@@ -1711,6 +1787,7 @@ function saveStudent() {
     }
 
     renderStudents();
+    autoSaveForm();
     closeModal('student-modal');
 
     // Clear inputs
@@ -1889,6 +1966,7 @@ function saveTeacher() {
     }
 
     renderTeachers();
+    autoSaveForm();
     closeModal('teacher-modal');
     document.getElementById('tch-firstname').value = '';
     document.getElementById('tch-lastname').value = '';
@@ -2259,13 +2337,13 @@ async function saveAward() {
 
         // 6. Check Result
         if (result.success) {
+            clearFormDraft();
             Swal.fire({
                 title: 'บันทึกข้อมูลสำเร็จ',
                 text: 'ข้อมูลรางวัลถูกบันทึกเรียบร้อยแล้ว',
                 icon: 'success',
                 confirmButtonText: 'ตกลง',
                 confirmButtonColor: '#2563EB'
-            }).then(() => {
             }).then(() => {
                 location.reload(); // Full refresh as requested
             });
@@ -2308,6 +2386,82 @@ function resetForm() {
     // Reset Work Group input (hidden)
     document.getElementById('comp-work-other').classList.add('hidden');
     document.querySelector('.file-upload-zone').classList.remove('has-file');
+    clearFormDraft();
+}
+
+// --- AUTO-SAVE FORM DRAFT ---
+const FORM_DRAFT_KEY = 'pk_form_draft';
+
+function autoSaveForm() {
+    try {
+        const draft = {
+            compName: document.getElementById('comp-name').value,
+            compOrg: document.getElementById('comp-org').value,
+            compDate: document.getElementById('comp-date').value,
+            compRank: document.getElementById('comp-rank').value,
+            compRankOther: document.getElementById('comp-rank-other').value,
+            level: document.querySelector('input[name="level"]:checked')?.value || '',
+            deptGroups: selectedDeptGroups,
+            workGroups: selectedWorkGroups,
+            students: students,
+            teachers: teachers,
+            step: currentStep,
+            savedAt: Date.now()
+        };
+        localStorage.setItem(FORM_DRAFT_KEY, JSON.stringify(draft));
+    } catch (e) { /* silent fail */ }
+}
+
+function restoreFormDraft() {
+    try {
+        const raw = localStorage.getItem(FORM_DRAFT_KEY);
+        if (!raw) return;
+        const draft = JSON.parse(raw);
+        // Only restore if saved within last 24 hours
+        if (Date.now() - draft.savedAt > 24 * 60 * 60 * 1000) {
+            clearFormDraft();
+            return;
+        }
+        if (draft.compName) document.getElementById('comp-name').value = draft.compName;
+        if (draft.compOrg) document.getElementById('comp-org').value = draft.compOrg;
+        if (draft.compDate) document.getElementById('comp-date').value = draft.compDate;
+        if (draft.compRank) {
+            document.getElementById('comp-rank').value = draft.compRank;
+            if (draft.compRank === 'other' && draft.compRankOther) {
+                document.getElementById('comp-rank-other').value = draft.compRankOther;
+                document.getElementById('comp-rank-other').classList.remove('hidden');
+            }
+        }
+        if (draft.level) {
+            const radio = document.querySelector(`input[name="level"][value="${draft.level}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (draft.deptGroups?.length) { selectedDeptGroups = draft.deptGroups; renderDeptGroups(); }
+        if (draft.workGroups?.length) { selectedWorkGroups = draft.workGroups; renderWorkGroups(); }
+        if (draft.students?.length) { students = draft.students; renderStudents(); }
+        if (draft.teachers?.length) { teachers = draft.teachers; renderTeachers(); }
+
+        showToast('กู้คืนแบบร่างที่บันทึกไว้แล้ว', 'success');
+    } catch (e) { /* silent fail */ }
+}
+
+function clearFormDraft() {
+    localStorage.removeItem(FORM_DRAFT_KEY);
+}
+
+function initAutoSave() {
+    // Auto-save on input changes (debounced)
+    let saveTimeout;
+    const formEl = document.getElementById('wizard-form');
+    if (!formEl) return;
+    formEl.addEventListener('input', () => {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(autoSaveForm, 1000);
+    });
+    formEl.addEventListener('change', () => {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(autoSaveForm, 500);
+    });
 }
 
 // --- FILE UPLOAD HANDLING (Multi-File) ---
@@ -2401,27 +2555,209 @@ const DEPARTMENT_ORDER = [
 let pendingRewardData = [];
 
 function savePendingRewardsPDF() {
-    // 1. Select Content (The Table Container)
-    const element = document.getElementById('pending-rewards-table');
+    if (!pendingRewardData || pendingRewardData.length === 0) {
+        return showToast('ไม่มีข้อมูลสำหรับสร้าง PDF', 'warning');
+    }
 
-    // 2. Options
-    const opt = {
-        margin: [10, 10, 10, 10], // top, left, bottom, right
-        filename: 'รายงานสรุปเหรียญรางวัล.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-    };
-
-    // 3. Generate (Show loading toast first)
-    showToast('กำลังสร้างไฟล์ PDF...', 'info');
-
-    html2pdf().set(opt).from(element).save().then(() => {
-        showToast('ดาวน์โหลด PDF สำเร็จ', 'success');
-    }).catch(err => {
-        console.error(err);
-        showToast('เกิดข้อผิดพลาดในการสร้าง PDF', 'error');
+    // Build clean HTML for a new print window
+    const groups = {};
+    pendingRewardData.forEach(item => {
+        const deptGroups = toArray(item.onBehalfOf);
+        const workGroups = toArray(item.department);
+        let dept = '';
+        if (deptGroups.length > 0) dept = deptGroups.join(', ');
+        else if (workGroups.length > 0) dept = workGroups.join(', ');
+        else dept = 'อื่นๆ';
+        if (dept === 'กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี' || dept === 'งานห้องเรียนพิเศษ SMTE') {
+            dept = 'ห้องเรียนพิเศษ SMTE กับ วิทยาศาสตร์';
+        }
+        if (!groups[dept]) groups[dept] = [];
+        groups[dept].push(item);
     });
+
+    const sortedDepts = Object.keys(groups).sort((a, b) => {
+        let iA = DEPARTMENT_ORDER.indexOf(a), iB = DEPARTMENT_ORDER.indexOf(b);
+        if (iA === -1) iA = 999; if (iB === -1) iB = 999;
+        return iA - iB;
+    });
+
+    let rows = '';
+    let num = 1;
+    sortedDepts.forEach(dept => {
+        rows += `<tr class="dept-row"><td colspan="7">${dept}</td></tr>`;
+        groups[dept].sort((a, b) => {
+            const wA = getLevelWeight(a.level) * 100 + getRankWeight(a.rank);
+            const wB = getLevelWeight(b.level) * 100 + getRankWeight(b.rank);
+            return wB - wA;
+        });
+        groups[dept].forEach(item => {
+            const stdStr = (item.students || []).map(s => `${s.prefix || ''}${s.name} (${s.grade}/${s.room})`).join('<br>');
+            const tchStr = (item.teachers || []).map(t => `${t.prefix || ''}${t.name}`).join('<br>');
+            const dateStr = item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '-';
+            rows += `<tr>
+                <td class="center">${num++}</td>
+                <td>${item.competition || '-'}<br><small>${dateStr}</small></td>
+                <td class="center">${item.rank || '-'}</td>
+                <td class="center">${item.level || '-'}</td>
+                <td>${item.organizer || '-'}</td>
+                <td>${stdStr || '-'}</td>
+                <td>${tchStr || '-'}</td>
+            </tr>`;
+        });
+    });
+
+    const fullHTML = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>รายงานสรุปเหรียญรางวัล</title>
+<style>
+@page { size: A4 landscape; margin: 10mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif; font-size: 10px; color: #222; line-height: 1.4; }
+h2 { text-align: center; font-size: 16px; margin-bottom: 2px; }
+.subtitle { text-align: center; font-size: 10px; color: #888; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border: 1px solid #aaa; padding: 4px 6px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+th { background: #e2e8f0; font-weight: bold; text-align: center; padding: 6px; }
+td.center { text-align: center; }
+small { color: #888; font-size: 9px; }
+tr.dept-row td { background: #fde047; font-weight: bold; text-align: center; font-size: 11px; padding: 5px; }
+tbody tr { page-break-inside: avoid; }
+col.c1 { width: 3%; } col.c2 { width: 22%; } col.c3 { width: 10%; }
+col.c4 { width: 10%; } col.c5 { width: 12%; } col.c6 { width: 25%; } col.c7 { width: 18%; }
+.no-print { margin-top: 12px; text-align: center; }
+.no-print button { padding: 8px 24px; font-size: 13px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; }
+.btn-print { background: #2563eb; color: #fff; }
+@media print { .no-print { display: none; } }
+</style>
+</head><body>
+<h2>รายงานสรุปรางวัลที่รอรับ</h2>
+<p class="subtitle">จำนวน ${pendingRewardData.length} รายการ &bull; พิมพ์เมื่อ ${new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })}</p>
+<table>
+<colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col class="c6"><col class="c7"></colgroup>
+<thead><tr><th>#</th><th>รายการแข่งขัน</th><th>รางวัล</th><th>ระดับ</th><th>หน่วยงาน</th><th>นักเรียน</th><th>ครูที่ปรึกษา</th></tr></thead>
+<tbody>${rows}</tbody>
+</table>
+<div class="no-print">
+<button class="btn-print" onclick="window.print()">🖨️ บันทึก PDF / พิมพ์</button>
+<p style="margin-top:8px;font-size:11px;color:#888;">เลือก "Save as PDF" ในหน้าต่าง Print เพื่อบันทึกเป็น PDF</p>
+</div>
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+        printWindow.document.write(fullHTML);
+        printWindow.document.close();
+        showToast('เปิดหน้ารายงานแล้ว — กด "บันทึก PDF / พิมพ์" แล้วเลือก Save as PDF', 'success');
+    } else {
+        showToast('กรุณาอนุญาต Popup เพื่อเปิดหน้ารายงาน', 'warning');
+    }
+}
+
+function savePendingRewardsExcel() {
+    if (!pendingRewardData || pendingRewardData.length === 0) {
+        return showToast('ไม่มีข้อมูลสำหรับสร้าง Excel', 'warning');
+    }
+    if (typeof XLSX === 'undefined') {
+        return showToast('ไม่พบ SheetJS library', 'error');
+    }
+
+    showToast('กำลังสร้างไฟล์ Excel...', 'info');
+
+    // Group data by department (same as PDF)
+    const groups = {};
+    pendingRewardData.forEach(item => {
+        const deptGroups = toArray(item.onBehalfOf);
+        const workGroups = toArray(item.department);
+        let dept = '';
+        if (deptGroups.length > 0) dept = deptGroups.join(', ');
+        else if (workGroups.length > 0) dept = workGroups.join(', ');
+        else dept = 'อื่นๆ';
+        if (dept === 'กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี' || dept === 'งานห้องเรียนพิเศษ SMTE') {
+            dept = 'ห้องเรียนพิเศษ SMTE กับ วิทยาศาสตร์';
+        }
+        if (!groups[dept]) groups[dept] = [];
+        groups[dept].push(item);
+    });
+
+    const sortedDepts = Object.keys(groups).sort((a, b) => {
+        let iA = DEPARTMENT_ORDER.indexOf(a), iB = DEPARTMENT_ORDER.indexOf(b);
+        if (iA === -1) iA = 999; if (iB === -1) iB = 999;
+        return iA - iB;
+    });
+
+    // Build rows array for the worksheet
+    const wsData = [];
+    // Title rows
+    wsData.push(['รายงานสรุปรางวัลที่รอรับ']);
+    wsData.push([`จำนวน ${pendingRewardData.length} รายการ — ${new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })}`]);
+    wsData.push([]); // blank row
+    // Header
+    wsData.push(['#', 'รายการแข่งขัน', 'วันที่', 'รางวัล', 'ระดับ', 'หน่วยงาน', 'นักเรียน', 'ชั้น/ห้อง', 'ครูที่ปรึกษา']);
+
+    let num = 1;
+    sortedDepts.forEach(dept => {
+        // Department header row
+        wsData.push([dept, '', '', '', '', '', '', '', '']);
+
+        groups[dept].sort((a, b) => {
+            const wA = getLevelWeight(a.level) * 100 + getRankWeight(a.rank);
+            const wB = getLevelWeight(b.level) * 100 + getRankWeight(b.rank);
+            return wB - wA;
+        });
+
+        groups[dept].forEach(item => {
+            const stdNames = (item.students || []).map(s => `${s.prefix || ''}${s.name}`).join('\n');
+            const stdGrades = (item.students || []).map(s => `ม.${s.grade}/${s.room}`).join('\n');
+            const tchNames = (item.teachers || []).map(t => `${t.prefix || ''}${t.name}`).join('\n');
+            const dateStr = item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '-';
+
+            wsData.push([
+                num++,
+                item.competition || '-',
+                dateStr,
+                item.rank || '-',
+                item.level || '-',
+                item.organizer || '-',
+                stdNames || '-',
+                stdGrades || '-',
+                tchNames || '-'
+            ]);
+        });
+    });
+
+    // Create workbook & worksheet
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Column widths
+    ws['!cols'] = [
+        { wch: 4 },   // #
+        { wch: 35 },  // รายการแข่งขัน
+        { wch: 14 },  // วันที่
+        { wch: 14 },  // รางวัล
+        { wch: 14 },  // ระดับ
+        { wch: 18 },  // หน่วยงาน
+        { wch: 25 },  // นักเรียน
+        { wch: 10 },  // ชั้น/ห้อง
+        { wch: 22 },  // ครูที่ปรึกษา
+    ];
+
+    // Merge title row across all columns
+    ws['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
+    ];
+
+    // Merge department header rows
+    let rowIdx = 4; // start after title(0), subtitle(1), blank(2), header(3)
+    sortedDepts.forEach(dept => {
+        ws['!merges'].push({ s: { r: rowIdx, c: 0 }, e: { r: rowIdx, c: 8 } });
+        rowIdx += 1 + groups[dept].length;
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, 'รางวัลรอรับ');
+    XLSX.writeFile(wb, 'รายงานสรุปเหรียญรางวัล.xlsx');
+    showToast('ดาวน์โหลด Excel สำเร็จ', 'success');
 }
 
 // --- BULK SELECTION LOGIC ---
@@ -2507,23 +2843,39 @@ function selectAllVisible() {
 async function executeBulkAction(action) {
     if (selectedItems.size === 0) return showToast('กรุณาเลือกรายการอย่างน้อย 1 รายการ', 'warning');
 
+    // Build review list for confirmation dialog
+    let itemsList = '';
+    const selectedIndices = Array.from(selectedItems);
+    const previewItems = selectedIndices.slice(0, 8);
+    previewItems.forEach(idx => {
+        const item = groupedData[idx];
+        if (item) {
+            itemsList += `<div class="text-left text-sm py-1 border-b border-gray-100 last:border-0">
+                <span class="font-medium">${item.competition || '-'}</span>
+                <span class="text-gray-400 text-xs ml-1">(${item.rank || '-'})</span>
+            </div>`;
+        }
+    });
+    if (selectedIndices.length > 8) {
+        itemsList += `<div class="text-xs text-gray-400 pt-1">...และอีก ${selectedIndices.length - 8} รายการ</div>`;
+    }
+
     let title = action === 'receive' ? 'ยืนยันการรับรางวัล?' : 'ซ่อนรายการ?';
-    let text = action === 'receive'
-        ? `ยืนยันว่าได้รับรางวัลสำหรับ ${selectedItems.size} รายการที่เลือกแล้ว`
-        : `ต้องการซ่อน ${selectedItems.size} รายการที่เลือกใช่หรือไม่`;
     let confirmBtn = action === 'receive' ? 'ยืนยัน, ได้รับแล้ว' : 'ใช่, ซ่อนรายการ';
     let confirmColor = action === 'receive' ? '#22c55e' : '#64748b';
 
     Swal.fire({
         title: title,
-        text: text,
+        html: `<p class="text-sm text-gray-500 mb-3">${selectedItems.size} รายการที่เลือก:</p>
+               <div class="max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-3 text-left">${itemsList}</div>`,
         icon: 'question',
         showCancelButton: true,
         confirmButtonColor: confirmColor,
         cancelButtonColor: '#d1d5db',
         confirmButtonText: confirmBtn,
         cancelButtonText: 'ยกเลิก',
-        reverseButtons: true
+        reverseButtons: true,
+        width: 480
     }).then(async (result) => {
         if (result.isConfirmed) {
 
@@ -2534,9 +2886,11 @@ async function executeBulkAction(action) {
                 loading.style.visibility = 'visible';
 
                 const ids = [];
+                const affectedIndices = [];
                 selectedItems.forEach(index => {
                     if (groupedData[index] && groupedData[index].id) {
                         ids.push(groupedData[index].id);
+                        affectedIndices.push(index);
                     }
                 });
 
@@ -2568,13 +2922,14 @@ async function executeBulkAction(action) {
                         }
                     });
 
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'บันทึกสำเร็จ',
-                        text: action === 'receive' ? 'บันทึกการรับรางวัลเรียบร้อยแล้ว' : 'ซ่อนรายการเรียบร้อยแล้ว',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    // Track recently moved for badge
+                    ids.forEach(id => recentlyMovedIds.add(id));
+
+                    // Show Undo Toast instead of SweetAlert
+                    const msg = action === 'receive'
+                        ? `ย้าย ${ids.length} รายการไป "รับแล้ว"`
+                        : `ซ่อน ${ids.length} รายการเรียบร้อย`;
+                    showUndoToast(ids, affectedIndices, msg);
                 } else {
                     throw new Error(resData.error || 'Server returned error');
                 }
@@ -2607,15 +2962,34 @@ function renderPendingRewards() {
 
     const query = document.getElementById('pending-search-input').value.toLowerCase();
 
-    // 1. Filter Data (isGetReward != true AND Rank is not Participated)
-    // Exclude "เข้าร่วม" from pending rewards
-    let pending = groupedData.filter(item => {
-        const isNotReceived = item.isGetReward !== true;
-        const isNotParticipation = item.rank !== 'เข้าร่วม';
-        return isNotReceived && isNotParticipation;
+    // 1. Filter Data (isGetReward != true)
+    let pending = groupedData.filter(item => item.isGetReward !== true);
+
+    // 2. Student Deduplication: each student only appears at their highest competition level
+    // Build map: studentKey → highest level weight
+    const studentBestLevel = {};
+    pending.forEach(item => {
+        const lvlWeight = getLevelWeight(item.level || '');
+        (item.students || []).forEach(s => {
+            const key = `${s.name || ''}_${s.grade || ''}_${s.room || ''}`;
+            if (!studentBestLevel[key] || lvlWeight > studentBestLevel[key]) {
+                studentBestLevel[key] = lvlWeight;
+            }
+        });
     });
 
-    // 2. Search Filter
+    // Filter students in each entry: keep only students whose best level matches this entry's level
+    pending = pending.map(item => {
+        const lvlWeight = getLevelWeight(item.level || '');
+        const filteredStudents = (item.students || []).filter(s => {
+            const key = `${s.name || ''}_${s.grade || ''}_${s.room || ''}`;
+            return studentBestLevel[key] === lvlWeight;
+        });
+        // Return a shallow copy with filtered students, preserve original index
+        return { ...item, students: filteredStudents, _origIndex: groupedData.indexOf(item) };
+    }).filter(item => item.students.length > 0); // Remove entries with no students left
+
+    // 3. Search Filter
     if (query) {
         pending = pending.filter(item =>
             (item.competition || '').toLowerCase().includes(query) ||
@@ -2623,7 +2997,7 @@ function renderPendingRewards() {
         );
     }
 
-    // 3. Group by Department (Subject Group)
+    // 4. Group by Department (Subject Group)
     const groups = {};
     pending.forEach(item => {
         const deptGroups = toArray(item.onBehalfOf);
@@ -2644,7 +3018,7 @@ function renderPendingRewards() {
         groups[dept].push(item);
     });
 
-    // 4. Sort Groups (by DEPARTMENT_ORDER)
+    // 5. Sort Groups (by DEPARTMENT_ORDER)
     const sortedDepts = Object.keys(groups).sort((a, b) => {
         let indexA = DEPARTMENT_ORDER.indexOf(a);
         let indexB = DEPARTMENT_ORDER.indexOf(b);
@@ -2655,7 +3029,7 @@ function renderPendingRewards() {
 
     pendingRewardData = pending;
 
-    // 5. Render
+    // 6. Render
     if (pending.length === 0) {
         document.getElementById('no-pending-data').classList.remove('hidden');
         return;
@@ -2703,7 +3077,7 @@ function renderPendingRewards() {
 
         // Loop items
         groups[dept].forEach((item) => {
-            const globalIndex = groupedData.indexOf(item);
+            const globalIndex = item._origIndex !== undefined ? item._origIndex : groupedData.indexOf(item);
             const isSelected = selectedItems.has(globalIndex);
 
             // Format Students
@@ -2795,12 +3169,57 @@ function renderPendingRewards() {
         });
     });
 
+    // --- Mobile Card Layout ---
+    const cardsContainer = document.getElementById('pending-rewards-cards');
+    if (cardsContainer) {
+        let cardsHTML = '';
+        sortedDepts.forEach(dept => {
+            cardsHTML += `<div class="bg-yellow-300 text-gray-800 font-bold text-center text-sm py-2 px-3 rounded-xl">${dept}</div>`;
+            groups[dept].forEach(item => {
+                const globalIndex = item._origIndex !== undefined ? item._origIndex : groupedData.indexOf(item);
+                const isSelected = selectedItems.has(globalIndex);
+                const stdNames = (item.students || []).map(s => `${s.prefix || ''}${s.name} (${s.grade}/${s.room})`).join(', ');
+                const tchNames = (item.teachers || []).map(t => `${t.prefix || ''}${t.name}`).join(', ');
+                const dateStr = item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '';
+                const hasEvidence = item.fileUrls && (Array.isArray(item.fileUrls) ? item.fileUrls.length > 0 : item.fileUrls);
+
+                cardsHTML += `
+                    <div onclick="handleRowSelect(${globalIndex})" data-id="${globalIndex}"
+                        class="bg-white dark:bg-slate-800 rounded-xl border ${isSelected ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200 dark:border-slate-700'} p-4 space-y-2 transition active:scale-[0.98] item-row">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-bold text-gray-900 dark:text-white leading-snug">${item.competition || '-'}</p>
+                                <p class="text-xs text-gray-400 mt-0.5">${dateStr}</p>
+                            </div>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                ${hasEvidence ? `<button onclick="event.stopPropagation(); ${Array.isArray(item.fileUrls) && item.fileUrls.length > 1 ? `openDetailFromSummary(${globalIndex})` : `previewFile('${item.fileUrls[0] || item.fileUrls}')`}" class="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><i data-lucide="paperclip" class="w-4 h-4"></i></button>` : ''}
+                                ${isSelectionMode ? `<input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-blue-600 pointer-events-none" ${isSelected ? 'checked' : ''}>` : ''}
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">${item.rank || '-'}</span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">${item.level || '-'}</span>
+                            ${item.organizer ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300">${item.organizer}</span>` : ''}
+                        </div>
+                        ${stdNames ? `<div class="text-xs text-gray-600 dark:text-gray-400"><span class="font-semibold text-gray-700 dark:text-gray-300">นักเรียน:</span> ${stdNames}</div>` : ''}
+                        ${tchNames ? `<div class="text-xs text-gray-500 dark:text-gray-400"><span class="font-semibold text-gray-600 dark:text-gray-300">ครู:</span> ${tchNames}</div>` : ''}
+                    </div>
+                `;
+            });
+        });
+        cardsContainer.innerHTML = cardsHTML;
+    }
+
+    updateRewardTabCounts();
     lucide.createIcons();
 }
 
 function markAsReceived(index, type) {
+    const item = groupedData[index];
+    if (!item) return;
+
     let title = 'ยืนยันการรับรางวัล?';
-    let text = "รายการนี้จะถูกบันทึกว่าได้รับรางวัลแล้ว";
+    let text = `"${(item.competition || '-').substring(0, 60)}"`;
     let confirmBtn = 'ใช่, ได้รับแล้ว';
     let confirmColor = '#22c55e'; // Green
 
@@ -2827,61 +3246,45 @@ function markAsReceived(index, type) {
     }).then(async (result) => {
         if (result.isConfirmed) {
 
-            // If it's single item receive, we need to call API
-            if (type === 'receive' || type !== 'reject') {
-                try {
-                    const loading = document.getElementById('loading');
-                    loading.classList.remove('invisible');
-                    loading.style.visibility = 'visible';
+            try {
+                const loading = document.getElementById('loading');
+                loading.classList.remove('invisible');
+                loading.style.visibility = 'visible';
 
-                    const payload = {
-                        "action": "mark_rewarded",
-                        "token": localStorage.getItem('auth_token') || (appState.user ? appState.token : ''),
-                        "ids": [groupedData[index].id]
-                    };
+                const payload = {
+                    "action": "mark_rewarded",
+                    "token": localStorage.getItem('auth_token') || (appState.user ? appState.token : ''),
+                    "ids": [item.id]
+                };
 
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        body: JSON.stringify(payload)
-                    });
-
-                    const resData = await response.json();
-
-                    loading.classList.add('invisible');
-                    loading.style.visibility = 'hidden';
-
-                    if (resData.success) {
-                        if (groupedData[index]) {
-                            groupedData[index].isGetReward = true;
-                        }
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'บันทึกสำเร็จ',
-                            timer: 1500,
-                            showConfirmButton: false
-                        });
-                        renderPendingRewards();
-                    } else {
-                        throw new Error(resData.error || 'Server error');
-                    }
-                } catch (e) {
-                    const loading = document.getElementById('loading');
-                    loading.classList.add('invisible');
-                    loading.style.visibility = 'hidden';
-                    Swal.fire('Error', e.message, 'error');
-                }
-            } else {
-                // Reject
-                if (groupedData[index]) {
-                    groupedData[index].isGetReward = true;
-                }
-                renderPendingRewards();
-                Swal.fire({
-                    icon: 'success',
-                    title: 'อัปเดตสถานะเรียบร้อย',
-                    timer: 1500,
-                    showConfirmButton: false
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
                 });
+
+                const resData = await response.json();
+
+                loading.classList.add('invisible');
+                loading.style.visibility = 'hidden';
+
+                if (resData.success) {
+                    if (groupedData[index]) {
+                        groupedData[index].isGetReward = true;
+                    }
+                    // Track recently moved for badge
+                    recentlyMovedIds.add(item.id);
+                    // Show Undo Toast
+                    const itemName = (item.competition || '').substring(0, 40);
+                    showUndoToast([item.id], [index], `ย้าย "${itemName}" ไป "รับแล้ว"`);
+                    renderPendingRewards();
+                } else {
+                    throw new Error(resData.error || 'Server error');
+                }
+            } catch (e) {
+                const loading = document.getElementById('loading');
+                loading.classList.add('invisible');
+                loading.style.visibility = 'hidden';
+                Swal.fire('Error', e.message, 'error');
             }
         }
     });
@@ -2889,6 +3292,546 @@ function markAsReceived(index, type) {
 
 function printPendingRewards() {
     window.print();
+}
+
+// --- REWARD TAB SYSTEM ---
+let currentRewardTab = 'pending';
+const receivedSelectedItems = new Set();
+
+// Undo Toast State
+let undoState = null; // { ids: [...], indices: [...], msg: '...' }
+let undoTimer = null;
+let undoProgressInterval = null;
+const UNDO_DURATION = 8000; // 8 seconds
+
+// Track items recently moved to "received" in this session
+const recentlyMovedIds = new Set();
+
+function showUndoToast(ids, indices, msg) {
+    dismissUndoToast(); // clear any existing
+    undoState = { ids, indices, msg };
+
+    const toast = document.getElementById('undo-toast');
+    const msgEl = document.getElementById('undo-toast-msg');
+    const progressEl = document.getElementById('undo-toast-progress');
+    if (!toast) return;
+
+    msgEl.textContent = msg;
+    progressEl.style.width = '100%';
+    toast.classList.remove('hidden');
+    // Trigger animation
+    requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-4', 'opacity-0');
+        toast.classList.add('translate-y-0', 'opacity-100');
+    });
+    lucide.createIcons();
+
+    const start = Date.now();
+    undoProgressInterval = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const pct = Math.max(0, 100 - (elapsed / UNDO_DURATION) * 100);
+        progressEl.style.width = pct + '%';
+    }, 50);
+
+    undoTimer = setTimeout(() => {
+        dismissUndoToast();
+    }, UNDO_DURATION);
+}
+
+function dismissUndoToast() {
+    if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+    if (undoProgressInterval) { clearInterval(undoProgressInterval); undoProgressInterval = null; }
+    undoState = null;
+    const toast = document.getElementById('undo-toast');
+    if (!toast) return;
+    toast.classList.add('translate-y-4', 'opacity-0');
+    toast.classList.remove('translate-y-0', 'opacity-100');
+    setTimeout(() => toast.classList.add('hidden'), 300);
+}
+
+async function executeUndo() {
+    if (!undoState) return;
+    const { ids, indices } = undoState;
+    dismissUndoToast();
+
+    try {
+        const loading = document.getElementById('loading');
+        loading.classList.remove('invisible');
+        loading.style.visibility = 'visible';
+
+        const resData = await callUnrewardAPI(ids);
+
+        loading.classList.add('invisible');
+        loading.style.visibility = 'hidden';
+
+        if (resData.success) {
+            indices.forEach(i => {
+                if (groupedData[i]) groupedData[i].isGetReward = false;
+            });
+            ids.forEach(id => recentlyMovedIds.delete(id));
+            showToast('เลิกทำเรียบร้อย — คืนรายการกลับแล้ว', 'success');
+            renderPendingRewards();
+            if (currentRewardTab === 'received') renderReceivedRewards();
+            updateRewardTabCounts();
+        } else {
+            throw new Error(resData.error || 'Server error');
+        }
+    } catch (err) {
+        const loading = document.getElementById('loading');
+        loading.classList.add('invisible');
+        loading.style.visibility = 'hidden';
+        console.error(err);
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'ไม่สามารถเลิกทำได้: ' + err.message });
+    }
+}
+
+// --- DATE RANGE PICKER LOGIC ---
+function toggleDateRangePicker() {
+    const picker = document.getElementById('date-range-picker');
+    if (picker) picker.classList.toggle('hidden');
+}
+
+function setDatePreset(preset) {
+    const fromEl = document.getElementById('date-range-from');
+    const toEl = document.getElementById('date-range-to');
+    const label = document.getElementById('date-range-label');
+    const now = new Date();
+
+    if (preset === 'all') {
+        fromEl.value = '';
+        toEl.value = '';
+        if (label) label.textContent = 'ทุกช่วงเวลา';
+    } else if (preset === 'this-month') {
+        const y = now.getFullYear(), m = now.getMonth();
+        fromEl.value = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+        toEl.value = new Date(y, m + 1, 0).toISOString().split('T')[0];
+        if (label) label.textContent = 'เดือนนี้';
+    } else if (preset === 'last-month') {
+        const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        fromEl.value = d.toISOString().split('T')[0];
+        toEl.value = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+        if (label) label.textContent = 'เดือนที่แล้ว';
+    } else if (preset === '3-months') {
+        const d = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        fromEl.value = d.toISOString().split('T')[0];
+        toEl.value = now.toISOString().split('T')[0];
+        if (label) label.textContent = '3 เดือนล่าสุด';
+    } else if (preset === '6-months') {
+        const d = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        fromEl.value = d.toISOString().split('T')[0];
+        toEl.value = now.toISOString().split('T')[0];
+        if (label) label.textContent = '6 เดือนล่าสุด';
+    } else if (preset === 'this-year') {
+        fromEl.value = `${now.getFullYear()}-01-01`;
+        toEl.value = now.toISOString().split('T')[0];
+        if (label) label.textContent = `ปี ${now.getFullYear()}`;
+    }
+
+    // Update active preset button styles
+    document.querySelectorAll('.date-preset-btn').forEach(btn => {
+        btn.className = 'date-preset-btn px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition';
+    });
+    event.target.className = 'date-preset-btn px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-600 hover:bg-blue-200 transition';
+
+    toggleDateRangePicker();
+    renderReceivedRewards();
+}
+
+function applyCustomDateRange() {
+    const fromVal = document.getElementById('date-range-from')?.value;
+    const toVal = document.getElementById('date-range-to')?.value;
+    const label = document.getElementById('date-range-label');
+
+    if (fromVal && toVal) {
+        const from = new Date(fromVal);
+        const to = new Date(toVal);
+        label.textContent = `${from.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - ${to.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}`;
+    } else if (fromVal) {
+        label.textContent = `ตั้งแต่ ${new Date(fromVal).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`;
+    } else if (toVal) {
+        label.textContent = `ถึง ${new Date(toVal).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`;
+    }
+
+    // Reset preset highlights
+    document.querySelectorAll('.date-preset-btn').forEach(btn => {
+        btn.className = 'date-preset-btn px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition';
+    });
+
+    renderReceivedRewards();
+}
+
+function clearDateRange() {
+    document.getElementById('date-range-from').value = '';
+    document.getElementById('date-range-to').value = '';
+    document.getElementById('date-range-label').textContent = 'ทุกช่วงเวลา';
+    document.querySelectorAll('.date-preset-btn').forEach((btn, i) => {
+        btn.className = i === 0
+            ? 'date-preset-btn px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-600 hover:bg-blue-200 transition'
+            : 'date-preset-btn px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition';
+    });
+    toggleDateRangePicker();
+    renderReceivedRewards();
+}
+
+// Close date range picker when clicking outside
+document.addEventListener('click', function(e) {
+    const picker = document.getElementById('date-range-picker');
+    const toggle = document.getElementById('date-range-toggle');
+    if (picker && toggle && !picker.contains(e.target) && !toggle.contains(e.target)) {
+        picker.classList.add('hidden');
+    }
+});
+
+function switchRewardTab(tab) {
+    currentRewardTab = tab;
+    const tabPending = document.getElementById('tab-pending');
+    const tabReceived = document.getElementById('tab-received');
+    const contentPending = document.getElementById('reward-tab-pending');
+    const contentReceived = document.getElementById('reward-tab-received');
+    const headerBtns = document.querySelectorAll('#btn-toggle-select, [onclick*="savePendingRewardsPDF"], [onclick*="printPendingRewards"]');
+
+    if (tab === 'pending') {
+        tabPending.className = 'px-4 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition bg-white text-blue-600 border-gray-200 dark:bg-slate-800 dark:text-blue-400 dark:border-slate-700';
+        tabReceived.className = 'px-4 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition bg-gray-50 text-gray-400 border-gray-200 dark:bg-slate-900 dark:text-gray-500 dark:border-slate-700';
+        contentPending.classList.remove('hidden');
+        contentReceived.classList.add('hidden');
+        headerBtns.forEach(btn => btn.classList.remove('hidden'));
+        renderPendingRewards();
+    } else {
+        tabReceived.className = 'px-4 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition bg-white text-green-600 border-gray-200 dark:bg-slate-800 dark:text-green-400 dark:border-slate-700';
+        tabPending.className = 'px-4 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition bg-gray-50 text-gray-400 border-gray-200 dark:bg-slate-900 dark:text-gray-500 dark:border-slate-700';
+        contentReceived.classList.remove('hidden');
+        contentPending.classList.add('hidden');
+        headerBtns.forEach(btn => btn.classList.add('hidden'));
+        receivedSelectedItems.clear();
+        renderReceivedRewards();
+    }
+    updateRewardTabCounts();
+    lucide.createIcons();
+}
+
+function updateRewardTabCounts() {
+    const pendingCount = groupedData.filter(item => item.isGetReward !== true).length;
+    const receivedCount = groupedData.filter(item => item.isGetReward === true).length;
+    const elPending = document.getElementById('tab-pending-count');
+    const elReceived = document.getElementById('tab-received-count');
+    if (elPending) elPending.textContent = pendingCount;
+    if (elReceived) elReceived.textContent = receivedCount;
+}
+
+function renderReceivedRewards() {
+    const tbody = document.getElementById('received-rewards-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const query = (document.getElementById('received-search-input')?.value || '').toLowerCase();
+
+    let allReceived = groupedData.filter(item => item.isGetReward === true);
+
+    // Apply date range filter
+    let received = allReceived;
+    const fromVal = document.getElementById('date-range-from')?.value;
+    const toVal = document.getElementById('date-range-to')?.value;
+    if (fromVal || toVal) {
+        const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+        const toDate = toVal ? new Date(toVal + 'T23:59:59') : null;
+        received = received.filter(item => {
+            if (!item.awardDate) return false;
+            try {
+                const d = normalizeDate(item.awardDate);
+                if (!d || isNaN(d.getTime())) return false;
+                if (fromDate && d < fromDate) return false;
+                if (toDate && d > toDate) return false;
+                return true;
+            } catch (e) { return false; }
+        });
+    }
+
+    // Apply search filter
+    if (query) {
+        received = received.filter(item =>
+            (item.competition || '').toLowerCase().includes(query) ||
+            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
+        );
+    }
+
+    // Sort: recently moved first, then by level priority descending
+    received.sort((a, b) => {
+        const aRecent = recentlyMovedIds.has(a.id) ? 1 : 0;
+        const bRecent = recentlyMovedIds.has(b.id) ? 1 : 0;
+        if (aRecent !== bRecent) return bRecent - aRecent;
+        const wA = getLevelWeight(a.level) * 100 + getRankWeight(a.rank);
+        const wB = getLevelWeight(b.level) * 100 + getRankWeight(b.rank);
+        return wB - wA;
+    });
+
+    const noDataEl = document.getElementById('no-received-data');
+    if (received.length === 0) {
+        if (noDataEl) noDataEl.classList.remove('hidden');
+        updateReceivedBulkBar();
+        const cardsEl = document.getElementById('received-rewards-cards');
+        if (cardsEl) cardsEl.innerHTML = '';
+        return;
+    }
+    if (noDataEl) noDataEl.classList.add('hidden');
+
+    // Desktop Table Rows
+    received.forEach(item => {
+        const globalIndex = groupedData.indexOf(item);
+        const isSelected = receivedSelectedItems.has(globalIndex);
+        const isRecent = recentlyMovedIds.has(item.id);
+
+        const recentBadge = isRecent
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-600 ml-2 animate-pulse">เพิ่งย้ายมา</span>'
+            : '';
+
+        const stdStr = (item.students || []).map(s => `
+            <div class="flex items-center justify-between text-xs py-1 border-b border-dashed border-gray-100 last:border-0">
+                <span class="font-medium text-gray-700">${s.prefix || ''}${s.name}</span>
+                <span class="text-gray-400 ml-2">(${s.grade}/${s.room})</span>
+            </div>
+        `).join('');
+
+        const tchStr = (item.teachers || []).map(t => `
+            <div class="flex flex-col text-xs py-1 border-b border-dashed border-gray-100 last:border-0">
+                <span class="font-medium text-gray-700">${t.prefix || ''}${t.name}</span>
+                <span class="text-gray-400">${t.department || ''}</span>
+            </div>
+        `).join('');
+
+        const deptGroups = toArray(item.onBehalfOf);
+        const workGroups = toArray(item.department);
+        let dept = deptGroups.length > 0 ? deptGroups.join(', ') : (workGroups.length > 0 ? workGroups.join(', ') : 'อื่นๆ');
+
+        const rowBg = isRecent ? 'bg-amber-50/60 dark:bg-amber-900/10' : (isSelected ? 'bg-amber-50/50' : 'bg-white dark:bg-slate-900');
+
+        const row = `
+            <tr class="hover:bg-green-50/50 dark:hover:bg-green-900/10 transition border-b border-gray-100 last:border-0 align-top ${rowBg}">
+                <td class="px-4 py-3 align-top">
+                    <input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 received-row-cb"
+                        data-index="${globalIndex}" ${isSelected ? 'checked' : ''} onchange="toggleReceivedItem(${globalIndex}, this.checked)">
+                </td>
+                <td class="px-4 py-3 text-sm font-bold text-gray-700">${item.rank || '-'}</td>
+                <td class="px-4 py-3">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white leading-snug">${item.competition || '-'}${recentBadge}</div>
+                    <div class="text-xs text-gray-400 mt-1">${item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'long' }) : ''}</div>
+                </td>
+                <td class="px-4 py-3 text-xs text-gray-600 font-medium">${item.level || '-'}</td>
+                <td class="px-4 py-3 text-xs text-gray-600">${dept}</td>
+                <td class="px-4 py-3">${stdStr}</td>
+                <td class="px-4 py-3">${tchStr}</td>
+                <td class="px-4 py-3 text-center">
+                    <button onclick="unrewardSingle(${globalIndex})"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg text-xs font-bold transition"
+                        title="คืนกลับไปหน้ารอรับ">
+                        <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>
+                        คืน
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+
+    // Mobile Cards
+    const cardsContainer = document.getElementById('received-rewards-cards');
+    if (cardsContainer) {
+        let cardsHTML = '';
+        received.forEach(item => {
+            const globalIndex = groupedData.indexOf(item);
+            const isSelected = receivedSelectedItems.has(globalIndex);
+            const isRecent = recentlyMovedIds.has(item.id);
+            const stdNames = (item.students || []).map(s => `${s.prefix || ''}${s.name} (${s.grade}/${s.room})`).join(', ');
+            const tchNames = (item.teachers || []).map(t => `${t.prefix || ''}${t.name}`).join(', ');
+            const dateStr = item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '';
+
+            const cardBorder = isRecent ? 'border-amber-400 ring-1 ring-amber-200' : (isSelected ? 'border-amber-400 bg-amber-50/50' : 'border-gray-200 dark:border-slate-700');
+            const recentCardBadge = isRecent
+                ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-600 animate-pulse">เพิ่งย้ายมา</span>'
+                : '';
+
+            cardsHTML += `
+                <div class="bg-white dark:bg-slate-800 rounded-xl border ${cardBorder} p-4 space-y-2">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-start gap-2 flex-1 min-w-0">
+                            <input type="checkbox" class="w-4 h-4 mt-1 rounded border-gray-300 text-green-600 received-row-cb"
+                                data-index="${globalIndex}" ${isSelected ? 'checked' : ''} onchange="toggleReceivedItem(${globalIndex}, this.checked)">
+                            <div class="min-w-0">
+                                <p class="text-sm font-bold text-gray-900 dark:text-white leading-snug">${item.competition || '-'}</p>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <span class="text-xs text-gray-400">${dateStr}</span>
+                                    ${recentCardBadge}
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="unrewardSingle(${globalIndex})"
+                            class="shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded-lg text-xs font-bold transition">
+                            <i data-lucide="undo-2" class="w-3.5 h-3.5"></i>คืน
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">${item.rank || '-'}</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">${item.level || '-'}</span>
+                    </div>
+                    ${stdNames ? `<div class="text-xs text-gray-600 dark:text-gray-400"><span class="font-semibold text-gray-700 dark:text-gray-300">นักเรียน:</span> ${stdNames}</div>` : ''}
+                    ${tchNames ? `<div class="text-xs text-gray-500 dark:text-gray-400"><span class="font-semibold text-gray-600 dark:text-gray-300">ครู:</span> ${tchNames}</div>` : ''}
+                </div>
+            `;
+        });
+        cardsContainer.innerHTML = cardsHTML;
+    }
+
+    updateReceivedBulkBar();
+    lucide.createIcons();
+}
+
+function toggleReceivedItem(index, checked) {
+    if (checked) {
+        receivedSelectedItems.add(index);
+    } else {
+        receivedSelectedItems.delete(index);
+    }
+    updateReceivedBulkBar();
+}
+
+function toggleReceivedSelectAll(el) {
+    const checkboxes = document.querySelectorAll('.received-row-cb');
+    checkboxes.forEach(cb => {
+        const idx = parseInt(cb.dataset.index);
+        cb.checked = el.checked;
+        if (el.checked) receivedSelectedItems.add(idx);
+        else receivedSelectedItems.delete(idx);
+    });
+    updateReceivedBulkBar();
+}
+
+function updateReceivedBulkBar() {
+    const bar = document.getElementById('received-bulk-bar');
+    const countEl = document.getElementById('received-selected-count');
+    if (!bar) return;
+    if (receivedSelectedItems.size > 0) {
+        bar.classList.remove('hidden');
+        bar.classList.add('flex');
+        if (countEl) countEl.textContent = `เลือก ${receivedSelectedItems.size} รายการ`;
+    } else {
+        bar.classList.add('hidden');
+        bar.classList.remove('flex');
+    }
+}
+
+async function callUnrewardAPI(ids) {
+    const token = localStorage.getItem('authToken') || (appState.token || '');
+    const payload = {
+        "action": "mark_rewarded",
+        "token": token,
+        "ids": ids,
+        "status": false
+    };
+
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+    return await response.json();
+}
+
+async function unrewardSingle(index) {
+    const item = groupedData[index];
+    if (!item || !item.id) return;
+
+    const result = await Swal.fire({
+        title: 'คืนรายการนี้?',
+        text: 'รายการนี้จะถูกย้ายกลับไปที่หน้ารอรับรางวัล',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#d1d5db',
+        confirmButtonText: 'ใช่, คืนรายการ',
+        cancelButtonText: 'ยกเลิก',
+        reverseButtons: true
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const loading = document.getElementById('loading');
+        loading.classList.remove('invisible');
+        loading.style.visibility = 'visible';
+
+        const resData = await callUnrewardAPI([item.id]);
+
+        loading.classList.add('invisible');
+        loading.style.visibility = 'hidden';
+
+        if (resData.success) {
+            groupedData[index].isGetReward = false;
+            Swal.fire({ icon: 'success', title: 'คืนรายการเรียบร้อย', text: 'ย้ายกลับไปหน้ารอรับแล้ว', timer: 1500, showConfirmButton: false });
+            renderReceivedRewards();
+            updateRewardTabCounts();
+        } else {
+            throw new Error(resData.error || 'Server error');
+        }
+    } catch (err) {
+        const loading = document.getElementById('loading');
+        loading.classList.add('invisible');
+        loading.style.visibility = 'hidden';
+        console.error(err);
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'ไม่สามารถคืนรายการได้: ' + err.message });
+    }
+}
+
+async function bulkUnreward() {
+    if (receivedSelectedItems.size === 0) return showToast('กรุณาเลือกรายการอย่างน้อย 1 รายการ', 'warning');
+
+    const result = await Swal.fire({
+        title: `คืน ${receivedSelectedItems.size} รายการ?`,
+        text: 'รายการที่เลือกจะถูกย้ายกลับไปที่หน้ารอรับรางวัล',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#f59e0b',
+        cancelButtonColor: '#d1d5db',
+        confirmButtonText: 'ใช่, คืนทั้งหมด',
+        cancelButtonText: 'ยกเลิก',
+        reverseButtons: true
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const loading = document.getElementById('loading');
+        loading.classList.remove('invisible');
+        loading.style.visibility = 'visible';
+
+        const ids = [];
+        receivedSelectedItems.forEach(index => {
+            if (groupedData[index] && groupedData[index].id) {
+                ids.push(groupedData[index].id);
+            }
+        });
+
+        const resData = await callUnrewardAPI(ids);
+
+        loading.classList.add('invisible');
+        loading.style.visibility = 'hidden';
+
+        if (resData.success) {
+            receivedSelectedItems.forEach(index => {
+                if (groupedData[index]) groupedData[index].isGetReward = false;
+            });
+            receivedSelectedItems.clear();
+            Swal.fire({ icon: 'success', title: 'คืนรายการเรียบร้อย', text: `ย้าย ${ids.length} รายการกลับไปหน้ารอรับแล้ว`, timer: 1500, showConfirmButton: false });
+            renderReceivedRewards();
+            updateRewardTabCounts();
+        } else {
+            throw new Error(resData.error || 'Server error');
+        }
+    } catch (err) {
+        const loading = document.getElementById('loading');
+        loading.classList.add('invisible');
+        loading.style.visibility = 'hidden';
+        console.error(err);
+        Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: 'ไม่สามารถคืนรายการได้: ' + err.message });
+    }
 }
 
 // openDetailFromSummary - opens the detail modal from subject summary view
@@ -3100,3 +4043,639 @@ document.getElementById('comp-date')?.addEventListener('change', function (e) {
         });
     }
 });
+
+// --- MY AWARDS VIEW & EDIT AWARD LOGIC ---
+function renderMyAwards() {
+    const user = appState.user;
+    if (!user) return;
+
+    const isAdmin = user.role === 'Admin';
+    const userName = user.name || '';
+
+    // Update profile card
+    const avatarEl = document.getElementById('my-awards-avatar');
+    const nameEl = document.getElementById('my-awards-name');
+    const roleEl = document.getElementById('my-awards-role');
+    const subtitleEl = document.getElementById('my-awards-subtitle');
+
+    if (avatarEl) avatarEl.textContent = userName.charAt(0) || '?';
+    if (nameEl) nameEl.textContent = userName;
+    if (roleEl) roleEl.textContent = user.role || '-';
+    if (subtitleEl) subtitleEl.textContent = isAdmin ? 'ดูและแก้ไขผลงานทั้งหมดในระบบ' : 'รายการที่คุณเพิ่มเข้าระบบ';
+
+    // Filter awards by author or show all for admin
+    let myItems = [];
+    if (isAdmin) {
+        myItems = [...groupedData];
+    } else {
+        myItems = groupedData.filter(item => {
+            const authorName = item.author || '';
+            return authorName === userName;
+        });
+    }
+
+    // Search filter
+    const query = (document.getElementById('my-awards-search')?.value || '').toLowerCase();
+    if (query) {
+        myItems = myItems.filter(item =>
+            (item.competition || '').toLowerCase().includes(query) ||
+            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query)) ||
+            (item.teachers || []).some(t => (t.name || '').toLowerCase().includes(query))
+        );
+    }
+
+    // Update count
+    const countEl = document.getElementById('my-awards-count');
+    if (countEl) countEl.textContent = myItems.length;
+
+    const listEl = document.getElementById('my-awards-list');
+    const noDataEl = document.getElementById('no-my-awards');
+
+    if (myItems.length === 0) {
+        if (listEl) listEl.innerHTML = '';
+        if (noDataEl) noDataEl.classList.remove('hidden');
+        return;
+    }
+    if (noDataEl) noDataEl.classList.add('hidden');
+
+    // Sort by timestamp desc
+    myItems.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+    listEl.innerHTML = myItems.map((item, idx) => {
+        const dateStr = item.awardDate ? (normalizeDate(item.awardDate)?.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) || '-') : '-';
+        const stdNames = (item.students || []).slice(0, 2).map(s => `${s.prefix || ''}${s.name}`).join(', ');
+        const moreStd = (item.students || []).length > 2 ? ` +${item.students.length - 2}` : '';
+        const groups = toArray(item.onBehalfOf).join(', ') || '-';
+
+        let rankClass = 'bg-gray-100 text-gray-600';
+        const r = item.rank || '';
+        if (r.includes('ทอง') || (r.includes('ชนะเลิศ') && !r.includes('รอง'))) rankClass = 'bg-yellow-100 text-yellow-700';
+        else if (r.includes('เงิน')) rankClass = 'bg-gray-200 text-gray-700';
+        else if (r.includes('ทองแดง')) rankClass = 'bg-orange-100 text-orange-700';
+
+        const authorLabel = isAdmin && item.author ? `<span class="text-[10px] text-gray-400 ml-auto">โดย ${item.author}</span>` : '';
+
+        return `
+        <div onclick="openEditAwardModal(${idx})" class="bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl p-4 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-700 transition cursor-pointer group">
+            <div class="flex items-start gap-3">
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-1.5 mb-1.5">
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${rankClass}">${item.rank || '-'}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600">${item.level || '-'}</span>
+                        <span class="text-[10px] text-gray-400">${dateStr}</span>
+                        ${authorLabel}
+                    </div>
+                    <h4 class="font-bold text-sm text-gray-800 dark:text-white leading-tight mb-1 line-clamp-2">${item.competition || '-'}</h4>
+                    <p class="text-xs text-gray-400 truncate">${groups}</p>
+                    <p class="text-xs text-gray-500 mt-1 truncate">${stdNames}${moreStd}</p>
+                </div>
+                <div class="shrink-0 p-2 rounded-lg text-gray-300 group-hover:text-amber-500 transition">
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    lucide.createIcons();
+}
+
+// --- Edit Award State ---
+let editOnBehalfItems = [];
+let editDeptItems = [];
+let editOriginalSnapshot = '';
+let editFiles = { cert: null, photo: null };
+
+function escAttr(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function openEditAwardModal(localIdx) {
+    const user = appState.user;
+    if (!user) return;
+    const isAdmin = user.role === 'Admin';
+    const userName = user.name || '';
+
+    let myItems = isAdmin ? [...groupedData] : groupedData.filter(item => (item.author || '') === userName);
+    const query = (document.getElementById('my-awards-search')?.value || '').toLowerCase();
+    if (query) {
+        myItems = myItems.filter(item =>
+            (item.competition || '').toLowerCase().includes(query) ||
+            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query)) ||
+            (item.teachers || []).some(t => (t.name || '').toLowerCase().includes(query))
+        );
+    }
+    myItems.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+    const item = myItems[localIdx];
+    if (!item) return;
+
+    // Populate basic fields
+    document.getElementById('edit-award-id').value = item.id || '';
+    document.getElementById('edit-comp-name').value = item.competition || '';
+    document.getElementById('edit-comp-org').value = item.organizer || '';
+    document.getElementById('edit-notes').value = '';
+    document.getElementById('edit-notes-error').classList.add('hidden');
+
+    // Rank
+    const rankEl = document.getElementById('edit-comp-rank');
+    rankEl.value = Array.from(rankEl.options).find(o => o.value === (item.rank || '')) ? item.rank : '';
+
+    // Level
+    const levelEl = document.getElementById('edit-comp-level');
+    levelEl.value = Array.from(levelEl.options).find(o => o.value === (item.level || '')) ? item.level : '';
+
+    // Date
+    let dateVal = '';
+    if (item.awardDate) {
+        const d = normalizeDate(item.awardDate);
+        if (d && !isNaN(d.getTime())) dateVal = d.toISOString().split('T')[0];
+    }
+    document.getElementById('edit-comp-date').value = dateVal;
+
+    // OnBehalfOf multi-select chips
+    editOnBehalfItems = [...toArray(item.onBehalfOf)];
+    renderEditOnBehalfChips();
+    document.getElementById('edit-on-behalf-select').value = '';
+
+    // Department multi-select chips
+    editDeptItems = [...toArray(item.department)];
+    renderEditDeptChips();
+    document.getElementById('edit-dept-select').value = '';
+    document.getElementById('edit-dept-other-container').classList.add('hidden');
+
+    // Students — split name into firstname/lastname
+    const stdList = document.getElementById('edit-students-list');
+    stdList.innerHTML = (item.students || []).map((s, i) => {
+        const parts = (s.name || '').split(' ');
+        const fn = parts[0] || '';
+        const ln = parts.slice(1).join(' ') || '';
+        return renderEditStudentRow({ prefix: s.prefix || '', firstname: fn, lastname: ln, grade: s.grade || '', room: s.room || '' }, i);
+    }).join('');
+
+    // Teachers — split name into firstname/lastname
+    const tchList = document.getElementById('edit-teachers-list');
+    tchList.innerHTML = (item.teachers || []).map((t, i) => {
+        const parts = (t.name || '').split(' ');
+        const fn = parts[0] || '';
+        const ln = parts.slice(1).join(' ') || '';
+        return renderEditTeacherRow({ prefix: t.prefix || '', firstname: fn, lastname: ln, department: t.department || '' }, i);
+    }).join('');
+
+    // Reset file uploads
+    editFiles = { cert: null, photo: null };
+    resetEditFileUI('cert');
+    resetEditFileUI('photo');
+
+    // Save snapshot for change detection
+    editOriginalSnapshot = getEditFormSnapshot();
+
+    openModal('edit-award-modal');
+    lucide.createIcons();
+}
+
+// --- onBehalfOf multi-select ---
+function addEditOnBehalf() {
+    const sel = document.getElementById('edit-on-behalf-select');
+    const val = sel.value;
+    if (!val) return;
+    if (val === 'ไม่มีกลุ่มสาระ') { editOnBehalfItems = ['ไม่มีกลุ่มสาระ']; }
+    else {
+        editOnBehalfItems = editOnBehalfItems.filter(v => v !== 'ไม่มีกลุ่มสาระ');
+        if (!editOnBehalfItems.includes(val)) editOnBehalfItems.push(val);
+    }
+    sel.value = '';
+    renderEditOnBehalfChips();
+}
+function removeEditOnBehalf(val) {
+    editOnBehalfItems = editOnBehalfItems.filter(v => v !== val);
+    renderEditOnBehalfChips();
+}
+function renderEditOnBehalfChips() {
+    const container = document.getElementById('edit-on-behalf-chips');
+    container.innerHTML = editOnBehalfItems.map(v => `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium">
+            ${escAttr(v)}
+            <button type="button" onclick="removeEditOnBehalf('${escAttr(v)}')" class="text-blue-400 hover:text-red-500 ml-0.5">&times;</button>
+        </span>`).join('');
+}
+
+// --- Department multi-select ---
+function handleEditDeptChange() {
+    const sel = document.getElementById('edit-dept-select');
+    const val = sel.value;
+    if (!val) return;
+    if (val === 'other') {
+        document.getElementById('edit-dept-other-container').classList.remove('hidden');
+        sel.value = '';
+        return;
+    }
+    if (val === 'ไม่มีกลุ่มงาน') { editDeptItems = ['ไม่มีกลุ่มงาน']; }
+    else {
+        editDeptItems = editDeptItems.filter(v => v !== 'ไม่มีกลุ่มงาน');
+        if (!editDeptItems.includes(val)) editDeptItems.push(val);
+    }
+    sel.value = '';
+    renderEditDeptChips();
+}
+function addEditDeptOther() {
+    const input = document.getElementById('edit-dept-other-input');
+    const val = input.value.trim();
+    if (!val) return;
+    editDeptItems = editDeptItems.filter(v => v !== 'ไม่มีกลุ่มงาน');
+    if (!editDeptItems.includes(val)) editDeptItems.push(val);
+    input.value = '';
+    document.getElementById('edit-dept-other-container').classList.add('hidden');
+    renderEditDeptChips();
+}
+function removeEditDept(val) {
+    editDeptItems = editDeptItems.filter(v => v !== val);
+    renderEditDeptChips();
+}
+function renderEditDeptChips() {
+    const container = document.getElementById('edit-dept-chips');
+    container.innerHTML = editDeptItems.map(v => `
+        <span class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-medium">
+            ${escAttr(v)}
+            <button type="button" onclick="removeEditDept('${escAttr(v)}')" class="text-indigo-400 hover:text-red-500 ml-0.5">&times;</button>
+        </span>`).join('');
+}
+
+// --- Student row with dropdowns ---
+function renderEditStudentRow(s, idx) {
+    const prefixes = ['ด.ช.', 'ด.ญ.', 'นาย', 'นางสาว'];
+    const grades = ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'];
+    const prefixOpts = prefixes.map(p => `<option ${(s.prefix||'') === p ? 'selected' : ''}>${p}</option>`).join('');
+    const gradeOpts = grades.map(g => `<option ${(s.grade||'') === g ? 'selected' : ''}>${g}</option>`).join('');
+    let roomOpts = '';
+    for (let i = 1; i <= 15; i++) { roomOpts += `<option ${String(s.room||'') === String(i) ? 'selected' : ''}>${i}</option>`; }
+    return `
+    <div class="p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-700" data-student-idx="${idx}">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-bold text-gray-400 uppercase">นักเรียนคนที่ ${idx + 1}</span>
+            <button type="button" onclick="this.closest('[data-student-idx]').remove()" class="text-red-400 hover:text-red-600 text-xs flex items-center gap-0.5">
+                <i data-lucide="trash-2" class="w-3 h-3"></i> ลบ
+            </button>
+        </div>
+        <div class="grid grid-cols-4 gap-1.5">
+            <select class="edit-std-prefix col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">${prefixOpts}</select>
+            <input type="text" value="${escAttr(s.firstname)}" placeholder="ชื่อ" class="edit-std-firstname col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">
+            <input type="text" value="${escAttr(s.lastname)}" placeholder="นามสกุล" class="edit-std-lastname col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">
+            <div class="col-span-1 flex gap-1">
+                <select class="edit-std-grade flex-1 px-1 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">${gradeOpts}</select>
+                <select class="edit-std-room w-10 px-1 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none text-center">${roomOpts}</select>
+            </div>
+        </div>
+    </div>`;
+}
+
+// --- Teacher row with dropdowns ---
+function renderEditTeacherRow(t, idx) {
+    const prefixes = ['นาย', 'นาง', 'นางสาว', 'ว่าที่ร้อยตรี', 'ดร.'];
+    const depts = [
+        'กลุ่มสาระการเรียนรู้คณิตศาสตร์', 'กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี',
+        'กลุ่มสาระการเรียนรู้ภาษาไทย', 'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ',
+        'กลุ่มสาระการเรียนรู้สังคมศึกษา ศาสนาและวัฒนธรรม', 'กลุ่มสาระการเรียนรู้สุขศึกษา พลศึกษา',
+        'กลุ่มสาระการเรียนรู้ศิลปะ', 'กลุ่มสาระการเรียนรู้การงานอาชีพ',
+        'กิจกรรมพัฒนาผู้เรียน (ลูกเสือ)', 'งานแนะแนว', 'งานเทคโนโลยี',
+        'งานสภานักเรียน', 'งานห้องสมุด', 'งานห้องเรียนสีเขียว', 'งาน to be number one'
+    ];
+    const pVal = t.prefix || '';
+    const isOtherPrefix = pVal && !prefixes.includes(pVal);
+    const prefixOpts = prefixes.map(p => `<option ${pVal === p ? 'selected' : ''}>${p}</option>`).join('')
+        + `<option value="other" ${isOtherPrefix ? 'selected' : ''}>อื่นๆ (ระบุ)</option>`;
+
+    const dVal = t.department || '';
+    const isOtherDept = dVal && !depts.includes(dVal);
+    const deptOpts = `<option value="">-- เลือกกลุ่มสาระ --</option>`
+        + depts.map(d => `<option ${dVal === d ? 'selected' : ''}>${d}</option>`).join('')
+        + `<option value="other" ${isOtherDept ? 'selected' : ''}>อื่นๆ (โปรดระบุ)</option>`;
+
+    return `
+    <div class="p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-700" data-teacher-idx="${idx}">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-[10px] font-bold text-gray-400 uppercase">ครูคนที่ ${idx + 1}</span>
+            <button type="button" onclick="this.closest('[data-teacher-idx]').remove()" class="text-red-400 hover:text-red-600 text-xs flex items-center gap-0.5">
+                <i data-lucide="trash-2" class="w-3 h-3"></i> ลบ
+            </button>
+        </div>
+        <div class="grid grid-cols-3 gap-1.5 mb-1.5">
+            <select class="edit-tch-prefix col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none" onchange="toggleEditTchPrefixOther(this)">${prefixOpts}</select>
+            <input type="text" value="${escAttr(t.firstname)}" placeholder="ชื่อ" class="edit-tch-firstname col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">
+            <input type="text" value="${escAttr(t.lastname)}" placeholder="นามสกุล" class="edit-tch-lastname col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">
+        </div>
+        <input type="text" value="${isOtherPrefix ? escAttr(pVal) : ''}" placeholder="ระบุคำนำหน้า..." class="edit-tch-prefix-other w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none mb-1.5 ${isOtherPrefix ? '' : 'hidden'}">
+        <select class="edit-tch-dept w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none" onchange="toggleEditTchDeptOther(this)">${deptOpts}</select>
+        <input type="text" value="${isOtherDept ? escAttr(dVal) : ''}" placeholder="ระบุกลุ่มสาระ/งาน..." class="edit-tch-dept-other w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none mt-1.5 ${isOtherDept ? '' : 'hidden'}">
+    </div>`;
+}
+
+function toggleEditTchPrefixOther(sel) {
+    const otherInput = sel.closest('[data-teacher-idx]').querySelector('.edit-tch-prefix-other');
+    if (sel.value === 'other') { otherInput.classList.remove('hidden'); otherInput.focus(); }
+    else { otherInput.classList.add('hidden'); otherInput.value = ''; }
+}
+function toggleEditTchDeptOther(sel) {
+    const otherInput = sel.closest('[data-teacher-idx]').querySelector('.edit-tch-dept-other');
+    if (sel.value === 'other') { otherInput.classList.remove('hidden'); otherInput.focus(); }
+    else { otherInput.classList.add('hidden'); otherInput.value = ''; }
+}
+
+function addEditStudent() {
+    const list = document.getElementById('edit-students-list');
+    const idx = list.children.length;
+    list.insertAdjacentHTML('beforeend', renderEditStudentRow({ prefix: 'ด.ช.', firstname: '', lastname: '', grade: 'ม.1', room: '1' }, idx));
+    lucide.createIcons();
+}
+
+function addEditTeacher() {
+    const list = document.getElementById('edit-teachers-list');
+    const idx = list.children.length;
+    list.insertAdjacentHTML('beforeend', renderEditTeacherRow({ prefix: 'นาย', firstname: '', lastname: '', department: '' }, idx));
+    lucide.createIcons();
+}
+
+// --- Edit File Upload ---
+function handleEditFileSelect(event, type) {
+    const file = event.target.files[0];
+    if (!file) return;
+    event.target.value = '';
+
+    if (file.size > MAX_FILE_SIZE) {
+        return showToast('ไฟล์มีขนาดเกิน 30MB', 'error');
+    }
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+        return showToast('รองรับเฉพาะไฟล์รูปภาพและ PDF', 'error');
+    }
+
+    editFiles[type] = file;
+
+    const placeholder = document.getElementById(`edit-${type}-placeholder`);
+    const preview = document.getElementById(`edit-${type}-preview`);
+    const nameEl = document.getElementById(`edit-${type}-name`);
+    placeholder.classList.add('hidden');
+    preview.classList.remove('hidden');
+    preview.classList.add('flex');
+    nameEl.textContent = file.name;
+    showToast('เลือกไฟล์เรียบร้อย', 'success');
+}
+
+function resetEditFileUI(type) {
+    editFiles[type] = null;
+    const placeholder = document.getElementById(`edit-${type}-placeholder`);
+    const preview = document.getElementById(`edit-${type}-preview`);
+    if (placeholder) { placeholder.classList.remove('hidden'); }
+    if (preview) { preview.classList.add('hidden'); preview.classList.remove('flex'); }
+    const input = document.getElementById(`edit-evidence-${type}`);
+    if (input) input.value = '';
+}
+
+function clearEditFile(event, type) {
+    if (event) event.stopPropagation();
+    resetEditFileUI(type);
+}
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// --- Change detection ---
+function getEditFormSnapshot() {
+    const data = {
+        name: document.getElementById('edit-comp-name')?.value || '',
+        rank: document.getElementById('edit-comp-rank')?.value || '',
+        level: document.getElementById('edit-comp-level')?.value || '',
+        org: document.getElementById('edit-comp-org')?.value || '',
+        date: document.getElementById('edit-comp-date')?.value || '',
+        onBehalf: [...editOnBehalfItems],
+        dept: [...editDeptItems],
+        students: collectEditStudents(),
+        teachers: collectEditTeachers()
+    };
+    return JSON.stringify(data);
+}
+
+function collectEditStudents() {
+    const rows = document.querySelectorAll('#edit-students-list [data-student-idx]');
+    return Array.from(rows).map(row => ({
+        prefix: row.querySelector('.edit-std-prefix')?.value?.trim() || '',
+        firstname: row.querySelector('.edit-std-firstname')?.value?.trim() || '',
+        lastname: row.querySelector('.edit-std-lastname')?.value?.trim() || '',
+        grade: row.querySelector('.edit-std-grade')?.value?.trim() || '',
+        room: row.querySelector('.edit-std-room')?.value?.trim() || ''
+    })).filter(s => s.firstname || s.lastname);
+}
+
+function collectEditTeachers() {
+    const rows = document.querySelectorAll('#edit-teachers-list [data-teacher-idx]');
+    return Array.from(rows).map(row => {
+        let prefix = row.querySelector('.edit-tch-prefix')?.value?.trim() || '';
+        if (prefix === 'other') prefix = row.querySelector('.edit-tch-prefix-other')?.value?.trim() || '';
+        let dept = row.querySelector('.edit-tch-dept')?.value?.trim() || '';
+        if (dept === 'other') dept = row.querySelector('.edit-tch-dept-other')?.value?.trim() || '';
+        return {
+            prefix,
+            firstname: row.querySelector('.edit-tch-firstname')?.value?.trim() || '',
+            lastname: row.querySelector('.edit-tch-lastname')?.value?.trim() || '',
+            department: dept
+        };
+    }).filter(t => t.firstname || t.lastname);
+}
+
+async function submitEditAward() {
+    const id = document.getElementById('edit-award-id').value;
+    if (!id) return showToast('ไม่พบ ID รายการ', 'error');
+
+    const token = localStorage.getItem('authToken');
+    if (!token) return showToast('กรุณาเข้าสู่ระบบใหม่', 'error');
+
+    // Check notes required
+    const notes = document.getElementById('edit-notes').value.trim();
+    if (!notes) {
+        document.getElementById('edit-notes-error').classList.remove('hidden');
+        document.getElementById('edit-notes').focus();
+        return showToast('กรุณาระบุหมายเหตุว่าแก้ไขอะไร', 'warning');
+    }
+    document.getElementById('edit-notes-error').classList.add('hidden');
+
+    // Check if anything actually changed (including files)
+    const currentSnapshot = getEditFormSnapshot();
+    const hasNewFiles = editFiles.cert || editFiles.photo;
+    if (currentSnapshot === editOriginalSnapshot && !hasNewFiles) {
+        showToast('ไม่มีข้อมูลที่เปลี่ยนแปลง', 'info');
+        closeModal('edit-award-modal');
+        return;
+    }
+
+    // Build students/teachers arrays with combined name
+    const editStudents = collectEditStudents().map(s => ({
+        prefix: s.prefix,
+        name: (s.firstname + ' ' + s.lastname).trim(),
+        grade: s.grade,
+        room: s.room
+    }));
+    const editTeachers = collectEditTeachers().map(t => ({
+        prefix: t.prefix,
+        name: (t.firstname + ' ' + t.lastname).trim(),
+        department: t.department
+    }));
+
+    const btn = document.getElementById('edit-award-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> กำลังบันทึก...';
+    lucide.createIcons();
+
+    // Convert files to base64
+    const files = [];
+    try {
+        if (editFiles.cert) {
+            const b64 = await fileToBase64(editFiles.cert);
+            files.push({ name: editFiles.cert.name, type: editFiles.cert.type, data: b64 });
+        }
+        if (editFiles.photo) {
+            const b64 = await fileToBase64(editFiles.photo);
+            files.push({ name: editFiles.photo.name, type: editFiles.photo.type, data: b64 });
+        }
+    } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> บันทึกการแก้ไข';
+        lucide.createIcons();
+        return showToast('ไม่สามารถอ่านไฟล์ได้: ' + e.message, 'error');
+    }
+
+    const payload = {
+        action: 'edit_award',
+        token: token,
+        id: id,
+        awardRank: document.getElementById('edit-comp-rank').value,
+        competitionName: document.getElementById('edit-comp-name').value,
+        awardLevel: document.getElementById('edit-comp-level').value,
+        organizer: document.getElementById('edit-comp-org').value,
+        awardDate: document.getElementById('edit-comp-date').value,
+        onBehalfOf: editOnBehalfItems,
+        department: editDeptItems,
+        students: editStudents,
+        teachers: editTeachers,
+        notes: notes,
+        files: files
+    };
+
+    console.log(payload);
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('แก้ไขข้อมูลสำเร็จ', 'success');
+            closeModal('edit-award-modal');
+
+            const idx = groupedData.findIndex(d => d.id === id);
+            if (idx !== -1) {
+                groupedData[idx].competition = payload.competitionName;
+                groupedData[idx].rank = payload.awardRank;
+                groupedData[idx].level = payload.awardLevel;
+                groupedData[idx].organizer = payload.organizer;
+                groupedData[idx].awardDate = payload.awardDate;
+                groupedData[idx].onBehalfOf = payload.onBehalfOf;
+                groupedData[idx].department = payload.department;
+                groupedData[idx].students = payload.students;
+                groupedData[idx].teachers = payload.teachers;
+                groupedData[idx].notes = payload.notes;
+            }
+            renderMyAwards();
+            handleSearch();
+        } else {
+            showToast(result.message || 'แก้ไขไม่สำเร็จ', 'error');
+        }
+    } catch (err) {
+        console.error('Edit Award Error:', err);
+        showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> บันทึกการแก้ไข';
+        lucide.createIcons();
+    }
+}
+
+// ===== DEV: Mock Data Generator (ลบทิ้งตอน production) =====
+function injectMockData(count = 100) {
+    const competitions = [
+        'การแข่งขันคณิตศาสตร์โอลิมปิก', 'การประกวดโครงงานวิทยาศาสตร์', 'การแข่งขันตอบปัญหาฟิสิกส์',
+        'การประกวดสิ่งประดิษฐ์ทางวิทยาศาสตร์', 'การแข่งขันหุ่นยนต์อัตโนมัติ', 'การแข่งขันเขียนโปรแกรมคอมพิวเตอร์',
+        'การประกวดวาดภาพ', 'การแข่งขันกีฬาว่ายน้ำ', 'การประกวดร้องเพลงไทยลูกทุ่ง', 'การแข่งขันทักษะภาษาอังกฤษ',
+        'การแข่งขันเศรษฐศาสตร์เพชรยอดมงกุฎ', 'การประกวดโครงงานคุณธรรม', 'การแข่งขันตอบปัญหาสังคมศึกษา',
+        'การแข่งขันอัจฉริยภาพทางวิทยาศาสตร์', 'การแข่งขัน A-Math', 'การแข่งขันวิทยาศาสตร์โลกและอวกาศ',
+        'การประกวดสุนทรพจน์ภาษาไทย', 'การแข่งขันกรีฑา', 'การแข่งขันแบดมินตัน', 'การประกวดดนตรีสากล'
+    ];
+    const ranks = ['ชนะเลิศ', 'รองชนะเลิศอันดับที่ 1', 'รองชนะเลิศอันดับที่ 2', 'เหรียญทอง', 'เหรียญเงิน', 'เหรียญทองแดง', 'ชมเชย', 'เข้าร่วม'];
+    const levels = ['ระดับนานาชาติ', 'ระดับชาติ', 'ระดับภาค', 'ระดับจังหวัด', 'ระดับเขตพื้นที่ฯ', 'ระดับอำเภอ', 'ระดับโรงเรียน'];
+    const depts = ['กลุ่มสาระการเรียนรู้วิทยาศาสตร์และเทคโนโลยี', 'กลุ่มสาระการเรียนรู้คณิตศาสตร์', 'กลุ่มสาระการเรียนรู้ภาษาไทย',
+        'กลุ่มสาระการเรียนรู้ภาษาต่างประเทศ', 'กลุ่มสาระการเรียนรู้สังคมศึกษาฯ', 'กลุ่มสาระการเรียนรู้ศิลปะ',
+        'กลุ่มสาระการเรียนรู้สุขศึกษาและพลศึกษา', 'งานห้องเรียนพิเศษ SMTE'];
+    const orgs = ['สพฐ.', 'สสวท.', 'มหาวิทยาลัยเกษตรศาสตร์', 'สมาคมคณิตศาสตร์แห่งประเทศไทย', 'กระทรวงศึกษาธิการ',
+        'สำนักงานเขตพื้นที่การศึกษา', 'จุฬาลงกรณ์มหาวิทยาลัย', 'มหาวิทยาลัยขอนแก่น'];
+    const firstNames = ['สมชาย', 'สมหญิง', 'ปิยะ', 'วิภา', 'กิตติ', 'นภัสสร', 'ธนกร', 'พิมพ์ลภัส', 'ศุภวิชญ์', 'กัญญาณัฐ',
+        'ภูมิพัฒน์', 'ณัฐณิชา', 'พีรพัฒน์', 'ชนิดาภา', 'รัชชานนท์', 'ปภาวรินทร์'];
+    const lastNames = ['สุขใจ', 'ดีงาม', 'มั่นคง', 'รุ่งเรือง', 'พัฒนา', 'สว่างวงศ์', 'เจริญสุข', 'ศรีสมบัติ'];
+    const prefixes = ['นาย', 'นางสาว', 'เด็กชาย', 'เด็กหญิง'];
+    const tPrefixes = ['นาย', 'นาง', 'นางสาว'];
+    const tFirstNames = ['สุภาพร', 'วิชัย', 'ประภาส', 'สมศรี', 'ธนวัฒน์', 'อรุณี', 'มานะ', 'จิราภรณ์'];
+
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+    const newItems = [];
+    for (let i = 0; i < count; i++) {
+        const numStudents = randInt(1, 4);
+        const students = [];
+        for (let s = 0; s < numStudents; s++) {
+            students.push({ prefix: pick(prefixes), name: pick(firstNames) + ' ' + pick(lastNames), grade: String(randInt(1, 6)), room: String(randInt(1, 12)) });
+        }
+        const numTeachers = randInt(1, 2);
+        const teachers = [];
+        for (let t = 0; t < numTeachers; t++) {
+            teachers.push({ prefix: pick(tPrefixes), name: pick(tFirstNames) + ' ' + pick(lastNames), department: pick(depts) });
+        }
+
+        const month = randInt(1, 12);
+        const year = pick([2025, 2025, 2026, 2026, 2026]);
+        const day = randInt(1, 28);
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+        const isReceived = Math.random() < 0.3; // 30% already received
+
+        newItems.push({
+            id: 'mock_' + Date.now() + '_' + i,
+            competition: pick(competitions) + ' ครั้งที่ ' + randInt(1, 30),
+            rank: pick(ranks),
+            level: pick(levels),
+            awardDate: dateStr,
+            organizer: pick(orgs),
+            onBehalfOf: [pick(depts)],
+            department: [],
+            students: students,
+            teachers: teachers,
+            isGetReward: isReceived,
+            timestamp: new Date(year, month - 1, day).toISOString(),
+            notes: ''
+        });
+    }
+
+    groupedData.push(...newItems);
+    processAndRender();
+    if (typeof renderPendingRewards === 'function') renderPendingRewards();
+    console.log(`✅ Injected ${count} mock items (${newItems.filter(x => x.isGetReward).length} received, ${newItems.filter(x => !x.isGetReward).length} pending)`);
+    showToast(`เพิ่ม ${count} รายการทดสอบเรียบร้อย`, 'success');
+}

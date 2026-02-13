@@ -36,6 +36,11 @@ body {
     overflow-x: hidden;
 }
 
+html.dark body {
+    background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+    color: #e2e8f0;
+}
+
 /* Mobile horizontal scroll prevention */
 html,
 body {
