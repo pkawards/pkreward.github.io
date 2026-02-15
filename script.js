@@ -2261,6 +2261,7 @@ async function saveAward() {
         const payload = {
             "action": "save_award",
             "token": localStorage.getItem('authToken'),
+            "author": appState.user ? appState.user.username : '', // Add author for filtering
 
             // Mapped Columns
             "awardRank": rank,
@@ -3474,7 +3475,7 @@ function clearDateRange() {
 }
 
 // Close date range picker when clicking outside
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
     const picker = document.getElementById('date-range-picker');
     const toggle = document.getElementById('date-range-toggle');
     if (picker && toggle && !picker.contains(e.target) && !toggle.contains(e.target)) {
@@ -4050,7 +4051,7 @@ function renderMyAwards() {
     if (!user) return;
 
     const isAdmin = user.role === 'Admin';
-    const userName = user.name || '';
+    const userName = user.username || ''; // Use username for filtering/display as requested
 
     // Update profile card
     const avatarEl = document.getElementById('my-awards-avatar');
@@ -4146,14 +4147,14 @@ let editOriginalSnapshot = '';
 let editFiles = { cert: null, photo: null };
 
 function escAttr(str) {
-    return String(str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function openEditAwardModal(localIdx) {
     const user = appState.user;
     if (!user) return;
     const isAdmin = user.role === 'Admin';
-    const userName = user.name || '';
+    const userName = user.username || ''; // Use username to match renderMyAwards
 
     let myItems = isAdmin ? [...groupedData] : groupedData.filter(item => (item.author || '') === userName);
     const query = (document.getElementById('my-awards-search')?.value || '').toLowerCase();
@@ -4304,10 +4305,10 @@ function renderEditDeptChips() {
 function renderEditStudentRow(s, idx) {
     const prefixes = ['ด.ช.', 'ด.ญ.', 'นาย', 'นางสาว'];
     const grades = ['ม.1', 'ม.2', 'ม.3', 'ม.4', 'ม.5', 'ม.6'];
-    const prefixOpts = prefixes.map(p => `<option ${(s.prefix||'') === p ? 'selected' : ''}>${p}</option>`).join('');
-    const gradeOpts = grades.map(g => `<option ${(s.grade||'') === g ? 'selected' : ''}>${g}</option>`).join('');
+    const prefixOpts = prefixes.map(p => `<option ${(s.prefix || '') === p ? 'selected' : ''}>${p}</option>`).join('');
+    const gradeOpts = grades.map(g => `<option ${(s.grade || '') === g ? 'selected' : ''}>${g}</option>`).join('');
     let roomOpts = '';
-    for (let i = 1; i <= 15; i++) { roomOpts += `<option ${String(s.room||'') === String(i) ? 'selected' : ''}>${i}</option>`; }
+    for (let i = 1; i <= 15; i++) { roomOpts += `<option ${String(s.room || '') === String(i) ? 'selected' : ''}>${i}</option>`; }
     return `
     <div class="p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-700" data-student-idx="${idx}">
         <div class="flex items-center justify-between mb-2">
