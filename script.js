@@ -362,6 +362,17 @@ function processAndRender() {
 
     // 3. Update Stats
     updateDashboardStats();
+
+    // 4. Render whichever view is currently active
+    if (currentView === 'subject-summary') {
+        renderSubjectSummary();
+        renderSubjectFilters();
+    } else if (currentView === 'pending-rewards') {
+        renderPendingRewards();
+    } else if (currentView === 'my-awards') {
+        renderMyAwards();
+    }
+    // Dashboard is already rendered by handleSort() → handleSearch() → renderAwards()
 }
 
 // Old groupAwards function removed as API now returns structured data
@@ -436,14 +447,27 @@ function getLevelWeight(level) {
     return 1; // โรงเรียน
 }
 
+function getLevelColorClass(level) {
+    const l = level || "";
+    if (l.includes("นานาชาติ")) return "bg-rose-100 text-rose-800 border border-rose-200 dark:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800/50";
+    if (l.includes("ประเทศ") || l.includes("ชาติ")) return "bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800/50";
+    if (l.includes("ภาค")) return "bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-800/50";
+    if (l.includes("จังหวัด")) return "bg-cyan-100 text-cyan-800 border border-cyan-200 dark:bg-cyan-900/50 dark:text-cyan-300 dark:border-cyan-800/50";
+    if (l.includes("เขต")) return "bg-sky-100 text-sky-800 border border-sky-200 dark:bg-sky-900/50 dark:text-sky-300 dark:border-sky-800/50";
+    if (l.includes("โรงเรียน")) return "bg-emerald-100 text-emerald-800 border border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800/50";
+    return "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
+}
+
 function handleSearch() {
     const query = document.getElementById('search-input').value.toLowerCase();
+    const levelFilter = document.getElementById('level-filter-select')?.value || 'all';
+
     filteredData = groupedData.filter(item => {
         const matchComp = item.competition?.toLowerCase().includes(query);
-        const matchStudent = item.students?.some(s => s.name?.toLowerCase().includes(query));
+        const matchStudent = item.students?.some(s => ((s.prefix || '') + (s.name || '')).toLowerCase().includes(query));
 
         // Enhanced Search
-        const matchTeacher = item.teachers?.some(t => t.name?.toLowerCase().includes(query));
+        const matchTeacher = item.teachers?.some(t => ((t.prefix || '') + (t.name || '')).toLowerCase().includes(query));
 
         // Handle array fields for search
         const deptStr = toArray(item.department).join(' ').toLowerCase();
@@ -452,10 +476,22 @@ function handleSearch() {
         const matchDept = deptStr.includes(query) || groupStr.includes(query);
         const matchOrg = item.organizer?.toLowerCase().includes(query);
 
-        return matchComp || matchStudent || matchTeacher || matchDept || matchOrg;
+        const matchSearch = matchComp || matchStudent || matchTeacher || matchDept || matchOrg;
+
+        // Level Filter
+        if (levelFilter !== 'all') {
+            const lvl = (item.level || '').toLowerCase();
+            if (!lvl.includes(levelFilter.toLowerCase())) return false;
+        }
+
+        return matchSearch;
     });
     currentPage = 1; // Reset to page 1 on search
     renderAwards();
+}
+
+function handleLevelFilter() {
+    handleSearch(); // Re-filter with the new level
 }
 
 // --- PAGINATION (Feature #34) ---
@@ -636,6 +672,28 @@ function showDeptStats() {
 
 // --- SUBJECT SUMMARY VIEW (Feature) ---
 let activeSubjectFilter = 'all';
+let activeLevelFilter = 'all';
+
+function setLevelFilter(level) {
+    activeLevelFilter = level;
+
+    // Update button styles
+    const levels = ['all', 'international', 'nation', 'region', 'province', 'area', 'school'];
+    levels.forEach(l => {
+        const btn = document.getElementById(`btn-filter-lvl-${l}`);
+        if (!btn) return;
+
+        if (l === level) {
+            btn.classList.remove('bg-gray-100', 'text-gray-600', 'dark:bg-slate-800', 'dark:text-gray-300');
+            btn.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+        } else {
+            btn.classList.add('bg-gray-100', 'text-gray-600', 'dark:bg-slate-800', 'dark:text-gray-300');
+            btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+        }
+    });
+
+    renderSubjectSummary();
+}
 
 function renderSubjectSummary() {
 
@@ -656,9 +714,17 @@ function renderSubjectSummary() {
     if (query) {
         filtered = filtered.filter(item =>
             (item.competition || '').toLowerCase().includes(query) ||
-            (item.teachers || []).some(t => (t.department || '').toLowerCase().includes(query)) ||
-            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
+            (item.teachers || []).some(t => ((t.prefix || '') + (t.name || '')).toLowerCase().includes(query)) ||
+            (item.students || []).some(s => ((s.prefix || '') + (s.name || '')).toLowerCase().includes(query))
         );
+    }
+
+    // 2.5 Filter by level
+    if (activeLevelFilter !== 'all') {
+        filtered = filtered.filter(item => {
+            const lvl = normalizeLevel(item.level);
+            return lvl === activeLevelFilter;
+        });
     }
 
     // 3. Calculate level stats
@@ -740,19 +806,15 @@ function renderSubjectSummary() {
         items.forEach(item => {
             const globalIdx = groupedData.indexOf(item);
             const r = item.rank || '';
-            let rankClass = 'bg-blue-100 text-blue-800';
-            if (r.includes('ทอง') || r.includes('ชนะเลิศ')) rankClass = 'bg-yellow-100 text-yellow-800';
-            else if (r.includes('เงิน')) rankClass = 'bg-gray-100 text-gray-700';
-            else if (r.includes('ทองแดง')) rankClass = 'bg-orange-100 text-orange-800';
-            else if (r.includes('ชมเชย')) rankClass = 'bg-teal-100 text-teal-800';
-            else if (r.includes('เข้าร่วม')) rankClass = 'bg-slate-100 text-slate-600';
+            let rankClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300';
+            if (r.includes('ทอง') || r.includes('ชนะเลิศ')) rankClass = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400';
+            else if (r.includes('เงิน')) rankClass = 'bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-300';
+            else if (r.includes('ทองแดง')) rankClass = 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-400';
+            else if (r.includes('ชมเชย')) rankClass = 'bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-400';
+            else if (r.includes('เข้าร่วม')) rankClass = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
 
             const l = item.level || '';
-            let levelClass = 'bg-gray-100 text-gray-600';
-            if (l.includes('ประเทศ')) levelClass = 'bg-purple-100 text-purple-700';
-            if (l.includes('นานาชาติ')) levelClass = 'bg-pink-100 text-pink-700';
-            if (l.includes('ภาค')) levelClass = 'bg-indigo-100 text-indigo-700';
-            if (l.includes('เขต')) levelClass = 'bg-blue-100 text-blue-700';
+            let levelClass = getLevelColorClass(l);
 
             const studentNames = (item.students || []).map(s => s.name || '-').join(', ');
 
@@ -908,20 +970,14 @@ function renderAwards() {
         }
 
         // Rank Formatting
-        let rankClass = "bg-blue-100 text-blue-800";
+        let rankClass = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
         const r = item.rank || "";
-        if (r.includes("ทอง") || r.includes("ชนะเลิศ")) rankClass = "bg-yellow-100 text-yellow-800";
-        else if (r.includes("เงิน")) rankClass = "bg-gray-100 text-gray-700";
-        else if (r.includes("ทองแดง")) rankClass = "bg-orange-100 text-orange-800";
-        else if (r.includes("ชมเชย")) rankClass = "bg-teal-100 text-teal-800";
+        if (r.includes("ทอง") || r.includes("ชนะเลิศ")) rankClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400";
+        else if (r.includes("เงิน")) rankClass = "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-300";
+        else if (r.includes("ทองแดง")) rankClass = "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-400";
+        else if (r.includes("ชมเชย")) rankClass = "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-400";
 
-        let levelClass = "bg-gray-100 text-gray-600";
-        const l = item.level || "";
-        if (l.includes("ประเทศ")) levelClass = "bg-purple-100 text-purple-700";
-        if (l.includes("นานาชาติ")) levelClass = "bg-pink-100 text-pink-700";
-        if (l.includes("ภาค")) levelClass = "bg-indigo-100 text-indigo-700";
-        if (l.includes("เขต")) levelClass = "bg-blue-100 text-blue-700";
-        if (l.includes("อำเภอ")) levelClass = "bg-teal-100 text-teal-700";
+        let levelClass = getLevelColorClass(item.level);
 
         // Department Logic (Array Support)
         const groups = toArray(item.onBehalfOf);
@@ -1028,21 +1084,15 @@ function populateDetailModal(item) {
     document.getElementById('detail-level-badge').innerText = levels.join(', ') || 'ทั่วไป';
 
     // Set Badge Colors
-    let rankClass = "bg-blue-100 text-blue-800";
-    if (ranks.some(r => r.includes("ทอง") || r.includes("ชนะเลิศ"))) rankClass = "bg-yellow-100 text-yellow-800";
-    else if (ranks.some(r => r.includes("เงิน"))) rankClass = "bg-gray-100 text-gray-700";
-    else if (ranks.some(r => r.includes("ทองแดง"))) rankClass = "bg-orange-100 text-orange-800";
-    else if (ranks.some(r => r.includes("ชมเชย"))) rankClass = "bg-teal-100 text-teal-800";
+    let rankClass = "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
+    if (ranks.some(r => r.includes("ทอง") || r.includes("ชนะเลิศ"))) rankClass = "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400";
+    else if (ranks.some(r => r.includes("เงิน"))) rankClass = "bg-gray-100 text-gray-700 dark:bg-slate-700 dark:text-slate-300";
+    else if (ranks.some(r => r.includes("ทองแดง"))) rankClass = "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-400";
+    else if (ranks.some(r => r.includes("ชมเชย"))) rankClass = "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-400";
 
     document.getElementById('detail-rank-badge').className = `px-2.5 py-0.5 rounded-full text-xs font-bold ${rankClass}`;
 
-    let levelClass = "bg-gray-100 text-gray-600";
-    if (levels.some(l => l.includes("ประเทศ"))) levelClass = "bg-purple-100 text-purple-700";
-    else if (levels.some(l => l.includes("นานาชาติ"))) levelClass = "bg-pink-100 text-pink-700";
-    else if (levels.some(l => l.includes("ภาค"))) levelClass = "bg-indigo-100 text-indigo-700";
-    else if (levels.some(l => l.includes("เขต"))) levelClass = "bg-blue-100 text-blue-700";
-    else if (levels.some(l => l.includes("อำเภอ"))) levelClass = "bg-teal-100 text-teal-700";
-
+    let levelClass = getLevelColorClass(levels[0] || "");
     document.getElementById('detail-level-badge').className = `px-2.5 py-0.5 rounded-full text-xs font-bold ${levelClass}`;
 
     // Date
@@ -1289,10 +1339,10 @@ function updateSidebarActiveState(activeView) {
         if (!btn) return;
 
         // Reset styles
-        btn.className = "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition group border-l-4 border-transparent";
+        btn.className = "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition group border-l-4 border-transparent";
 
         const icon = btn.querySelector('i');
-        if (icon) icon.className = "w-5 h-5 text-slate-400 group-hover:text-blue-600 transition";
+        if (icon) icon.className = "w-5 h-5 text-gray-400 dark:text-slate-600 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition";
     });
 
     // Set Active
@@ -1300,11 +1350,11 @@ function updateSidebarActiveState(activeView) {
     if (activeId) {
         const activeBtn = document.getElementById(activeId);
         if (activeBtn) {
-            activeBtn.classList.remove('text-slate-500', 'hover:bg-slate-50', 'border-transparent');
-            activeBtn.classList.add('bg-gradient-to-r', 'from-blue-50', 'to-transparent', 'text-blue-700', 'border-pink-500');
+            activeBtn.classList.remove('text-gray-600', 'dark:text-gray-400', 'hover:bg-gray-50', 'dark:hover:bg-slate-800', 'border-transparent');
+            activeBtn.classList.add('bg-gradient-to-r', 'from-blue-50', 'dark:from-blue-900/40', 'to-transparent', 'text-blue-700', 'dark:text-blue-300', 'border-blue-500');
 
             const icon = activeBtn.querySelector('i');
-            if (icon) icon.className = "w-5 h-5 text-blue-600";
+            if (icon) icon.className = "w-5 h-5 text-blue-600 dark:text-blue-400";
         }
     }
 }
@@ -2963,8 +3013,8 @@ function renderPendingRewards() {
 
     const query = document.getElementById('pending-search-input').value.toLowerCase();
 
-    // 1. Filter Data (isGetReward != true)
-    let pending = groupedData.filter(item => item.isGetReward !== true);
+    // 1. Filter Data (isGetReward != true) and exclude 'เข้าร่วม'
+    let pending = groupedData.filter(item => item.isGetReward !== true && item.rank !== 'เข้าร่วม');
 
     // 2. Student Deduplication: each student only appears at their highest competition level
     // Build map: studentKey → highest level weight
@@ -2994,7 +3044,8 @@ function renderPendingRewards() {
     if (query) {
         pending = pending.filter(item =>
             (item.competition || '').toLowerCase().includes(query) ||
-            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
+            (item.students || []).some(s => ((s.prefix || '') + (s.name || '')).toLowerCase().includes(query)) ||
+            (item.teachers || []).some(t => ((t.prefix || '') + (t.name || '')).toLowerCase().includes(query))
         );
     }
 
@@ -3032,35 +3083,45 @@ function renderPendingRewards() {
 
     // 6. Render
     if (pending.length === 0) {
-        document.getElementById('no-pending-data').classList.remove('hidden');
+        const noPendingEl = document.getElementById('no-pending-data');
+        noPendingEl.innerHTML = `
+            <i data-lucide="check-circle-2" class="w-12 h-12 mb-3 text-green-300 dark:text-green-800"></i>
+            <p>ไม่พบรายการที่รอรับรางวัล</p>
+        `;
+        noPendingEl.classList.remove('hidden');
+        lucide.createIcons();
         return;
     }
 
     document.getElementById('no-pending-data').classList.add('hidden');
 
-    // Initialize Sortable on the main Table to sort Groups (tbodies)
+    // Accordion-based department groups with drag-and-drop reorder
     new Sortable(table, {
         animation: 150,
-        handle: '.group-handle', // Drag handle for groups
-        draggable: 'tbody', // Sort tbodies
+        handle: '.group-handle',
+        draggable: 'tbody',
         ghostClass: 'opacity-50',
-        onEnd: function (evt) {
-            // Optional: Persist group order if needed
-        }
+        onEnd: function () { /* reorder persisted in DOM */ }
     });
 
-    sortedDepts.forEach(dept => {
+    sortedDepts.forEach((dept, deptIndex) => {
         // Create Tbody for this group
         const tbody = document.createElement('tbody');
-        tbody.className = "divide-y divide-gray-100 text-sm border-b-4 border-white group-container"; // Spacing between groups
+        tbody.className = "divide-y divide-gray-100 text-sm border-b-4 border-white group-container transition-all duration-300";
+        tbody.id = `dept-group-${deptIndex}`;
         table.appendChild(tbody);
 
-        // Header Row (Static) with Drag Handle
+        // Header Row with Drag Handle + Collapse Toggle
         tbody.innerHTML += `
-            <tr class="bg-yellow-300 text-gray-800 font-bold border-b border-yellow-400 ignore-elements group-handle cursor-move hover:bg-yellow-400 transition">
+            <tr class="bg-yellow-300 text-gray-800 font-bold border-b border-yellow-400 ignore-elements group-header hover:bg-yellow-400 transition">
                 <td colspan="7" class="px-4 py-2 text-center select-none relative">
-                    <div class="absolute left-2 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100">
-                        <i data-lucide="grip-vertical" class="w-5 h-5 text-gray-700"></i>
+                    <div class="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <div class="opacity-50 hover:opacity-100 cursor-move group-handle p-1" title="ลากเพื่อจัดลำดับ">
+                            <i data-lucide="grip-vertical" class="w-4 h-4 text-gray-700"></i>
+                        </div>
+                        <div class="opacity-70 hover:opacity-100 cursor-pointer bg-white/50 rounded-full p-1 transition-transform duration-200" id="dept-icon-${deptIndex}" onclick="event.stopPropagation(); toggleDeptGroup('dept-rows-${deptIndex}', 'dept-icon-${deptIndex}')">
+                            <i data-lucide="chevron-down" class="w-4 h-4 text-gray-800"></i>
+                        </div>
                     </div>
                     ${dept}
                 </td>
@@ -3068,8 +3129,6 @@ function renderPendingRewards() {
         `;
 
         // Sort items in group by Level Priority (High to Low), then Rank
-        // NOTE: If user drags, we are not persisting "manual order" in this variable permanently yet,
-        // but Sortable will rearrange DOM. Re-rendering (e.g. search) will reset to this sort order.
         groups[dept].sort((a, b) => {
             const weightA = getLevelWeight(a.level) * 100 + getRankWeight(a.rank);
             const weightB = getLevelWeight(b.level) * 100 + getRankWeight(b.rank);
@@ -3077,7 +3136,7 @@ function renderPendingRewards() {
         });
 
         // Loop items
-        groups[dept].forEach((item) => {
+        const rowsHtml = groups[dept].map((item) => {
             const globalIndex = item._origIndex !== undefined ? item._origIndex : groupedData.indexOf(item);
             const isSelected = selectedItems.has(globalIndex);
 
@@ -3089,9 +3148,9 @@ function renderPendingRewards() {
                 </div>
             `).join('');
 
-            const rowStr = `
+            return `
                 <tr onclick="handleRowSelect(${globalIndex})" 
-                    class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0 group align-top item-row bg-white ${isSelected ? 'bg-blue-50/50' : ''}" 
+                    class="dept-rows-${deptIndex} hover:bg-gray-50 transition border-b border-gray-100 last:border-0 group align-top item-row bg-white ${isSelected ? 'bg-blue-50/50' : ''}" 
                     data-id="${globalIndex}">
                     
                     <!-- Checkbox (Hidden by default) -->
@@ -3104,9 +3163,6 @@ function renderPendingRewards() {
 
                     <!-- Rank -->
                     <td class="px-4 py-3 text-sm font-bold text-gray-700 relative group-hover:bg-gray-100 transition-colors">
-                         <div class="absolute left-1 top-3 opacity-0 group-hover:opacity-100 text-gray-400 cursor-move ${isSelectionMode ? 'hidden' : ''}" title="ลากเพื่อเปลี่ยนลำดับ">
-                            <i data-lucide="grip-vertical" class="w-4 h-4"></i>
-                        </div>
                         <span class="ml-2">${item.rank || '-'}</span>
                     </td>
                     
@@ -3153,21 +3209,9 @@ function renderPendingRewards() {
 
                 </tr>
             `;
-            tbody.innerHTML += rowStr;
-        });
+        }).join('');
 
-        // Initialize Sortable on Tbody (for Items)
-        new Sortable(tbody, {
-            animation: 150,
-            handle: '.cursor-move', // Drag handle
-            draggable: '.item-row', // Only items are sortable
-            ghostClass: 'bg-blue-50',
-            filter: '.ignore-elements', // Ignore headers
-            disabled: isSelectionMode, // Disable drag in Select Mode
-            onEnd: function (evt) {
-                // Optional
-            }
-        });
+        tbody.innerHTML += rowsHtml;
     });
 
     // --- Mobile Card Layout ---
@@ -3213,6 +3257,29 @@ function renderPendingRewards() {
 
     updateRewardTabCounts();
     lucide.createIcons();
+}
+
+// --- DEPARTMENT ACCORDION LOGIC ---
+function toggleDeptGroup(rowClass, iconId) {
+    const rows = document.querySelectorAll('.' + rowClass);
+    const iconDiv = document.getElementById(iconId);
+    if (!rows.length || !iconDiv) return;
+
+    const isCurrentlyHidden = rows[0].classList.contains('hidden');
+
+    rows.forEach(row => {
+        if (isCurrentlyHidden) {
+            row.classList.remove('hidden');
+        } else {
+            row.classList.add('hidden');
+        }
+    });
+
+    if (isCurrentlyHidden) {
+        iconDiv.style.transform = "translateY(-50%) rotate(0deg)";
+    } else {
+        iconDiv.style.transform = "translateY(-50%) rotate(-90deg)";
+    }
 }
 
 function markAsReceived(index, type) {
@@ -3512,7 +3579,7 @@ function switchRewardTab(tab) {
 }
 
 function updateRewardTabCounts() {
-    const pendingCount = groupedData.filter(item => item.isGetReward !== true).length;
+    const pendingCount = groupedData.filter(item => item.isGetReward !== true && item.rank !== 'เข้าร่วม').length;
     const receivedCount = groupedData.filter(item => item.isGetReward === true).length;
     const elPending = document.getElementById('tab-pending-count');
     const elReceived = document.getElementById('tab-received-count');
@@ -3552,7 +3619,8 @@ function renderReceivedRewards() {
     if (query) {
         received = received.filter(item =>
             (item.competition || '').toLowerCase().includes(query) ||
-            (item.students || []).some(s => (s.name || '').toLowerCase().includes(query))
+            (item.students || []).some(s => ((s.prefix || '') + (s.name || '')).toLowerCase().includes(query)) ||
+            (item.teachers || []).some(t => ((t.prefix || '') + (t.name || '')).toLowerCase().includes(query))
         );
     }
 
