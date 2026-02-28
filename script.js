@@ -509,10 +509,11 @@ function changePage(direction) {
 function updateDashboardStats() {
     document.getElementById('stat-total').innerText = groupedData.length;
     const nationalCount = groupedData.filter(d =>
-        d["Award Level"]?.includes("ประเทศ") || d["Award Level"]?.includes("นานาชาติ")
+        d["level"]?.includes("ชาติ") || d["level"]?.includes("ประเทศ") || d["level"]?.includes("นานาชาติ")
     ).length;
     document.getElementById('stat-national').innerText = nationalCount;
 }
+
 
 // --- TEACHER STATS (Feature #New) ---
 function showTeacherStats() {
@@ -537,7 +538,8 @@ function showTeacherStats() {
                 if (!teacherStats[name]) {
                     teacherStats[name] = {
                         score: 0,
-                        projects: 0
+                        projects: 0,
+                        department: t.department || 'ไม่ระบุ'
                     };
                 }
                 teacherStats[name].projects++;
@@ -550,7 +552,8 @@ function showTeacherStats() {
     const sortedTeachers = Object.keys(teacherStats).map(name => ({
         name,
         projectCount: teacherStats[name].projects,
-        score: teacherStats[name].score
+        score: teacherStats[name].score,
+        department: teacherStats[name].department
     })).sort((a, b) => b.score - a.score); // Sort by Score DESC
 
     // 3. Take Top 10
@@ -566,19 +569,21 @@ function showTeacherStats() {
                 <table class="w-full text-sm item-table">
                     <thead class="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-gray-400">
                         <tr>
-                            <th class="px-4 py-3 text-left">อันดับ</th>
-                            <th class="px-4 py-3 text-left">ชื่อครู</th>
-                            <th class="px-4 py-3 text-center">คะแนน</th>
-                            <th class="px-4 py-3 text-center">ผลงาน (ชิ้น)</th>
+                            <th class="px-4 py-3 text-center whitespace-nowrap">อันดับ</th>
+                            <th class="px-4 py-3 text-left whitespace-nowrap">ชื่อครู</th>
+                            <th class="px-4 py-3 text-left whitespace-nowrap">กลุ่มสาระฯ</th>
+                            <th class="px-4 py-3 text-center whitespace-nowrap">คะแนน</th>
+                            <th class="px-4 py-3 text-center whitespace-nowrap">ผลงาน (ชิ้น)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
                         ${top10.map((t, i) => `
                             <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                <td class="px-4 py-3 font-bold text-gray-400 w-12 text-center">#${i + 1}</td>
-                                <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">${t.name}</td>
-                                <td class="px-4 py-3 text-center text-purple-600 font-bold">${t.score}</td>
-                                <td class="px-4 py-3 text-center text-gray-500">${t.projectCount}</td>
+                                <td class="px-4 py-3 font-bold text-gray-400 w-12 text-center whitespace-nowrap">#${i + 1}</td>
+                                <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">${t.name}</td>
+                                <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">${t.department}</td>
+                                <td class="px-4 py-3 text-center text-purple-600 font-bold whitespace-nowrap">${t.score}</td>
+                                <td class="px-4 py-3 text-center text-gray-500 whitespace-nowrap">${t.projectCount}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -591,7 +596,7 @@ function showTeacherStats() {
     Swal.fire({
         title: 'อันดับครูคุณภาพ (Top 10)',
         html: html,
-        width: 600,
+        width: 750,
         confirmButtonText: 'ปิด',
         confirmButtonColor: '#64748b'
     });
@@ -641,17 +646,17 @@ function showDeptStats() {
                 <table class="w-full text-sm item-table">
                     <thead class="bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-gray-400">
                         <tr>
-                            <th class="px-4 py-3 text-left">อันดับ</th>
-                            <th class="px-4 py-3 text-left">กลุ่มสาระฯ / งาน</th>
-                            <th class="px-4 py-3 text-center">จำนวนผลงาน (ชิ้น)</th>
+                            <th class="px-4 py-3 text-center whitespace-nowrap">อันดับ</th>
+                            <th class="px-4 py-3 text-left whitespace-nowrap">กลุ่มสาระฯ / งาน</th>
+                            <th class="px-4 py-3 text-center whitespace-nowrap">จำนวนผลงาน (ชิ้น)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-slate-700">
                         ${top10.map((d, i) => `
                             <tr class="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                <td class="px-4 py-3 font-bold text-gray-400 w-12 text-center">#${i + 1}</td>
-                                <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">${d.name}</td>
-                                <td class="px-4 py-3 text-center text-orange-600 font-bold">${d.count}</td>
+                                <td class="px-4 py-3 font-bold text-gray-400 w-12 text-center whitespace-nowrap">#${i + 1}</td>
+                                <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">${d.name}</td>
+                                <td class="px-4 py-3 text-center text-orange-600 font-bold whitespace-nowrap">${d.count}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -664,7 +669,7 @@ function showDeptStats() {
     Swal.fire({
         title: 'อันดับกลุ่มสาระฯ (Top 10)',
         html: html,
-        width: 600,
+        width: 650,
         confirmButtonText: 'ปิด',
         confirmButtonColor: '#64748b'
     });
@@ -1361,7 +1366,7 @@ function updateSidebarActiveState(activeView) {
 
 // --- WIZARD FORM LOGIC ---
 let currentStep = 1;
-const totalSteps = 4;
+const totalSteps = 5;
 let students = [];
 let teachers = [];
 let selectedDeptGroups = [];  // กลุ่มสาระ multi-select
@@ -1651,8 +1656,22 @@ function changeStep(direction) {
         }
     }
 
-    // Step 2 Validation (Students & Teachers)
+    // Step 2 Validation (Evidence - at least 1 file)
     if (direction === 1 && currentStep === 2) {
+        const hasCert = currentFiles.cert !== null;
+        const hasPhoto = currentFiles.photo !== null;
+        if (!hasCert && !hasPhoto) {
+            const fileErr = document.getElementById('file-error');
+            if (fileErr) { fileErr.classList.remove('hidden'); }
+            showToast('กรุณาแนบไฟล์หลักฐานอย่างน้อย 1 รายการ', 'error');
+            return;
+        }
+        const fileErr = document.getElementById('file-error');
+        if (fileErr) fileErr.classList.add('hidden');
+    }
+
+    // Step 3 Validation (Students)
+    if (direction === 1 && currentStep === 3) {
         if (students.length === 0) {
             showToast('กรุณาเพิ่มข้อมูลนักเรียนอย่างน้อย 1 คน', 'warning');
             return;
