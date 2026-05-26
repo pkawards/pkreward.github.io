@@ -1,4 +1,5 @@
 // Init Lucide Icons
+window.lucide = window.lucide || { createIcons: () => { } };
 lucide.createIcons();
 //old = https://script.google.com/macros/s/AKfycbziZFKakpzfrVgu-V6YwwfIk--TIaHlLc6sIsZD4s84e1i1Y6VxByF80RrLx5ZGCPtnhg/exec
 // --- CONSTANTS ---
@@ -606,17 +607,11 @@ function showTeacherStats() {
 function showDeptStats() {
     const deptStats = {};
 
-    // 1. Aggregate Stats
-    // 1. Aggregate Stats
+    // 1. Aggregate Stats using onBehalfOf
     groupedData.forEach(item => {
-        // Use Teacher's Department
-        const teachers = item.teachers || [];
-        if (teachers.length > 0) {
-            const uniqueDepts = new Set();
-            teachers.forEach(t => {
-                if (t.department) uniqueDepts.add(t.department);
-            });
-
+        const depts = item.onBehalfOf || [];
+        if (depts.length > 0) {
+            const uniqueDepts = new Set(depts.filter(d => d && d.trim()));
             if (uniqueDepts.size > 0) {
                 uniqueDepts.forEach(d => {
                     if (!deptStats[d]) deptStats[d] = 0;
@@ -709,9 +704,11 @@ function renderSubjectSummary() {
 
     if (activeSubjectFilter !== 'all') {
         filtered = filtered.filter(item => {
-            const teachers = item.teachers || [];
-            // Match if activeFilter is present in teachers department
-            return teachers.some(t => t.department === activeSubjectFilter);
+            const depts = item.onBehalfOf || [];
+            if (activeSubjectFilter === 'ไม่ระบุ') {
+                return depts.length === 0 || !depts.some(d => d && d.trim());
+            }
+            return depts.includes(activeSubjectFilter);
         });
     }
 
@@ -853,16 +850,15 @@ function renderSubjectSummary() {
 }
 
 function renderSubjectFilters() {
-    // Collect unique subject groups
-    // Collect unique teacher departments
+    // Collect unique subject groups from onBehalfOf
     const deptSet = new Set();
     groupedData.forEach(item => {
-        const teachers = item.teachers || [];
+        const depts = item.onBehalfOf || [];
         let hasDept = false;
 
-        teachers.forEach(t => {
-            if (t.department) {
-                deptSet.add(t.department);
+        depts.forEach(d => {
+            if (d && d.trim()) {
+                deptSet.add(d);
                 hasDept = true;
             }
         });
@@ -887,13 +883,13 @@ function renderSubjectFilters() {
 
         departments.forEach(dept => {
             const isActive = activeSubjectFilter === dept;
-            // Count items that have this dept in their teachers
+            // Count items that have this dept in their onBehalfOf
             const count = groupedData.filter(i => {
-                const teachers = i.teachers || [];
+                const depts = i.onBehalfOf || [];
                 if (dept === 'ไม่ระบุ') {
-                    return teachers.length === 0 || !teachers.some(t => t.department);
+                    return depts.length === 0 || !depts.some(d => d && d.trim());
                 }
-                return teachers.some(t => t.department === dept);
+                return depts.includes(dept);
             }).length;
 
             const safeDept = dept.replace(/'/g, "\\'");
@@ -916,9 +912,13 @@ function renderSubjectFilters() {
         let options = `<option value="all" ${activeSubjectFilter === 'all' ? 'selected' : ''}>ทุกกลุ่มสาระฯ (${groupedData.length})</option>`;
 
         departments.forEach(dept => {
-            // Count items that have this dept in their teachers
+            // Count items that have this dept in their onBehalfOf
             const count = groupedData.filter(i => {
-                return (i.teachers || []).some(t => (t.department || 'ไม่ระบุ') === dept);
+                const depts = i.onBehalfOf || [];
+                if (dept === 'ไม่ระบุ') {
+                    return depts.length === 0 || !depts.some(d => d && d.trim());
+                }
+                return depts.includes(dept);
             }).length;
 
             const isSelected = activeSubjectFilter === dept ? 'selected' : '';
@@ -1207,7 +1207,7 @@ function populateDetailModal(item) {
                             <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center font-bold text-xs text-gray-500">${char}</div>
                             <div>
                                 <p class="text-sm font-bold text-gray-800">${t.prefix || ''}${t.name || '-'}</p>
-                                <p class="text-xs text-gray-500 group-hover:text-blue-600 transition">${t.department}</p>
+                                <p class="text-xs text-gray-500 group-hover:text-blue-600 transition">${getPersonRoleSummary(t)}</p>
                             </div>
                         </div>
                     </div>
@@ -1672,11 +1672,7 @@ function changeStep(direction) {
 
     // Step 3 Validation (Students)
     if (direction === 1 && currentStep === 3) {
-        if (students.length === 0) {
-            showToast('กรุณาเพิ่มข้อมูลนักเรียนอย่างน้อย 1 คน', 'warning');
-            return;
-        }
-        // Teachers are optional now
+        // Students are optional now, allow skipping
     }
 
     const newStep = currentStep + direction;
@@ -1926,6 +1922,37 @@ function removeStudent(idx) {
     renderStudents();
 }
 
+function getPersonRoleType(person = {}) {
+    return person.roleType || person.personType || person.type || (person.isAdministrator ? 'administrator' : 'teacher');
+}
+
+function getPersonRoleLabel(roleType) {
+    return roleType === 'administrator' ? 'ผู้บริหาร' : 'ครู';
+}
+
+function getPersonRoleSummary(person = {}) {
+    const roleType = getPersonRoleType(person);
+    const departmentText = roleType === 'teacher' ? (person.department || '') : '';
+    return `${getPersonRoleLabel(roleType)}${departmentText ? ` · ${departmentText}` : ''}`;
+}
+
+function updateTeacherDepartmentVisibility() {
+    const roleEl = document.getElementById('tch-role');
+    const deptContainer = document.getElementById('tch-dept-container');
+    const deptSelect = document.getElementById('tch-dept');
+    const deptOther = document.getElementById('tch-dept-other');
+    const isAdministrator = roleEl?.value === 'administrator';
+
+    if (!deptContainer || !deptSelect || !deptOther) return;
+
+    deptContainer.classList.toggle('hidden', isAdministrator);
+    if (isAdministrator) {
+        deptSelect.value = '';
+        deptOther.value = '';
+        deptOther.classList.add('hidden');
+    }
+}
+
 function openTeacherModal(index = -1) {
     editingTeacherIndex = index;
     const modalTitle = document.querySelector('#teacher-modal h3');
@@ -1951,6 +1978,7 @@ function openTeacherModal(index = -1) {
 
         document.getElementById('tch-firstname').value = t.firstname;
         document.getElementById('tch-lastname').value = t.lastname;
+        document.getElementById('tch-role').value = getPersonRoleType(t);
 
         // Handle department
         const deptSelect = document.getElementById('tch-dept');
@@ -1968,7 +1996,7 @@ function openTeacherModal(index = -1) {
             deptOther.classList.remove('hidden');
         }
 
-        modalTitle.innerText = 'แก้ไขข้อมูลครู';
+        modalTitle.innerText = 'แก้ไขข้อมูลผู้บริหารและครู';
         submitBtn.innerText = 'บันทึกการแก้ไข';
     } else {
         document.getElementById('tch-title').value = 'นาย';
@@ -1977,13 +2005,15 @@ function openTeacherModal(index = -1) {
 
         document.getElementById('tch-firstname').value = '';
         document.getElementById('tch-lastname').value = '';
+        document.getElementById('tch-role').value = 'teacher';
         document.getElementById('tch-dept').value = '';
         document.getElementById('tch-dept-other').value = '';
         document.getElementById('tch-dept-other').classList.add('hidden');
 
-        modalTitle.innerText = 'เพิ่มข้อมูลครู';
+        modalTitle.innerText = 'เพิ่มข้อมูลผู้บริหารและครู';
         submitBtn.innerText = 'ยืนยัน';
     }
+    updateTeacherDepartmentVisibility();
     openModal('teacher-modal');
 }
 
@@ -1999,6 +2029,8 @@ document.getElementById('tch-title')?.addEventListener('change', function (e) {
     }
 });
 
+document.getElementById('tch-role')?.addEventListener('change', updateTeacherDepartmentVisibility);
+
 function saveTeacher() {
     const titleSelect = document.getElementById('tch-title');
     let title = titleSelect.value;
@@ -2007,6 +2039,7 @@ function saveTeacher() {
     }
     const firstname = document.getElementById('tch-firstname').value;
     const lastname = document.getElementById('tch-lastname').value;
+    const roleType = document.getElementById('tch-role')?.value || 'teacher';
 
     // Department Logic
     const deptSelect = document.getElementById('tch-dept');
@@ -2017,9 +2050,11 @@ function saveTeacher() {
 
     if (!title) return showToast('กรุณาระบุคำนำหน้าชื่อ', 'warning');
     if (!firstname || !lastname) return showToast('กรุณากรอกชื่อและนามสกุล', 'warning');
-    if (!department) return showToast('กรุณาระบุกลุ่มสาระฯ', 'warning');
+    if (roleType === 'teacher' && !department) return showToast('กรุณาระบุกลุ่มสาระฯ สำหรับครู', 'warning');
+    if (roleType === 'administrator') department = '';
 
     const teacherData = {
+        roleType,
         title,
         firstname,
         lastname,
@@ -2031,7 +2066,7 @@ function saveTeacher() {
         showToast('แก้ไขข้อมูลเรียบร้อย', 'success');
     } else {
         teachers.push(teacherData);
-        showToast('เพิ่มครูเรียบร้อย', 'success');
+        showToast('เพิ่มรายชื่อเรียบร้อย', 'success');
     }
 
     renderTeachers();
@@ -2057,7 +2092,9 @@ function renderTeachers() {
     }
 
     console.log(teachers);
-    container.innerHTML = teachers.map((t, idx) => `
+    container.innerHTML = teachers.map((t, idx) => {
+        const roleSummary = getPersonRoleSummary(t);
+        return `
                 <div class="bg-white p-3 rounded-lg border border-gray-100 shadow-sm flex justify-between items-center group" data-id="${idx}">
                     <div class="flex items-center gap-3">
                          <div class="cursor-move text-gray-300 hover:text-gray-500 transition">
@@ -2068,7 +2105,7 @@ function renderTeachers() {
                         </div>
                         <div>
                             <h4 class="font-bold text-sm text-gray-800">${t.title}${t.firstname} ${t.lastname}</h4>
-                            <p class="text-xs text-gray-500">${t.department || '-'}</p>
+                            <p class="text-xs text-gray-500">${roleSummary}</p>
                         </div>
                         </div>
                     </div>
@@ -2077,7 +2114,8 @@ function renderTeachers() {
                         <button onclick="removeTeacher(${idx})" class="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </div>
                 </div>
-            `).join('');
+            `;
+    }).join('');
     lucide.createIcons();
     initTeacherSortable();
 }
@@ -2186,7 +2224,9 @@ function renderSummary() {
     document.getElementById('summary-teacher-count').innerText = teachers.length;
 
     if (teachers.length > 0) {
-        teacherListContainer.innerHTML = teachers.map(t => `
+        teacherListContainer.innerHTML = teachers.map(t => {
+            const roleSummary = getPersonRoleSummary(t);
+            return `
                     <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100">
                         <div class="flex items-center gap-3">
                             <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs">
@@ -2194,11 +2234,12 @@ function renderSummary() {
                             </div>
                             <div>
                                 <p class="text-sm font-bold text-gray-800">${t.title}${t.firstname} ${t.lastname}</p>
-                                <p class="text-xs text-gray-500">${t.department}</p>
+                                <p class="text-xs text-gray-500">${roleSummary}</p>
                             </div>
                         </div>
                     </div>
-                `).join('');
+                `;
+        }).join('');
     } else {
         teacherListContainer.innerHTML = `<p class="text-sm text-gray-400 italic">ไม่มีข้อมูลครู</p>`;
     }
@@ -2325,6 +2366,10 @@ async function saveAward() {
             throw new Error("กรุณาแนบไฟล์อย่างน้อย 1 รายการ");
         }
 
+        if (teachers.some(t => getPersonRoleType(t) === 'teacher' && !t.department)) {
+            throw new Error("กรุณาระบุกลุ่มสาระฯ สำหรับครู");
+        }
+
         // --- 3. Construct Payload ---
         // Map data to match User Requirement exactly
         const payload = {
@@ -2354,9 +2399,10 @@ async function saveAward() {
             }))),
 
             "teachers": JSON.stringify(teachers.map(t => ({
+                roleType: getPersonRoleType(t),
                 prefix: t.title,
                 name: t.firstname + ' ' + t.lastname,
-                department: t.department // Updated to include department
+                department: getPersonRoleType(t) === 'teacher' ? t.department : ''
             }))),
 
             "files": JSON.stringify(filesPayload)
@@ -3211,7 +3257,7 @@ function renderPendingRewards() {
                         ${(item.teachers || []).map(t => `
                             <div class="flex flex-col text-xs py-1 border-b border-dashed border-gray-100 last:border-0">
                                 <span class="font-medium text-gray-700">${t.prefix || ''}${t.name}</span> 
-                                <span class="text-[10px] text-gray-400 group-hover:text-blue-500 transition">${t.department || 'ครูที่ปรึกษา'}</span>
+                                <span class="text-[10px] text-gray-400 group-hover:text-blue-500 transition">${getPersonRoleSummary(t)}</span>
                             </div>
                         `).join('')}
                     </td>
@@ -3683,7 +3729,7 @@ function renderReceivedRewards() {
         const tchStr = (item.teachers || []).map(t => `
             <div class="flex flex-col text-xs py-1 border-b border-dashed border-gray-100 last:border-0">
                 <span class="font-medium text-gray-700">${t.prefix || ''}${t.name}</span>
-                <span class="text-gray-400">${t.department || ''}</span>
+                <span class="text-gray-400">${getPersonRoleSummary(t)}</span>
             </div>
         `).join('');
 
@@ -3999,7 +4045,11 @@ function populateDetail(item) {
     document.getElementById('detail-tch-count').innerText = teachers.length;
 
     if (teachers.length > 0) {
-        tchList.innerHTML = teachers.map(t => `
+        tchList.innerHTML = teachers.map(t => {
+            const roleType = getPersonRoleType(t);
+            const roleLabel = getPersonRoleLabel(roleType);
+            const departmentText = roleType === 'teacher' ? (t.department || '') : '';
+            return `
             <div class="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-slate-800 border border-gray-100 dark:border-slate-700">
                 <div class="flex items-center gap-2">
                     <div class="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[10px] font-bold">
@@ -4007,12 +4057,13 @@ function populateDetail(item) {
                     </div>
                     <div>
                         <p class="text-xs font-bold text-gray-800 dark:text-gray-200">${t.prefix || ''}${t.name}</p>
-                        <p class="text-[10px] text-gray-500">ครูที่ปรึกษา</p>
-                        <p class="text-xs text-gray-500 group-hover:text-blue-600 transition">${t.department}</p>
+                        <p class="text-[10px] text-gray-500">${roleLabel}</p>
+                        ${departmentText ? `<p class="text-xs text-gray-500 group-hover:text-blue-600 transition">${departmentText}</p>` : ''}
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
     } else {
         tchList.innerHTML = `<p class="text-xs text-gray-400 italic">ไม่มีข้อมูล</p>`;
     }
@@ -4306,7 +4357,7 @@ function openEditAwardModal(localIdx) {
         const parts = (t.name || '').split(' ');
         const fn = parts[0] || '';
         const ln = parts.slice(1).join(' ') || '';
-        return renderEditTeacherRow({ prefix: t.prefix || '', firstname: fn, lastname: ln, department: t.department || '' }, i);
+        return renderEditTeacherRow({ roleType: getPersonRoleType(t), prefix: t.prefix || '', firstname: fn, lastname: ln, department: t.department || '' }, i);
     }).join('');
 
     // Reset file uploads
@@ -4434,6 +4485,11 @@ function renderEditTeacherRow(t, idx) {
 
     const dVal = t.department || '';
     const isOtherDept = dVal && !depts.includes(dVal);
+    const roleType = getPersonRoleType(t);
+    const isAdministrator = roleType === 'administrator';
+    const roleOpts = `
+        <option value="teacher" ${roleType === 'teacher' ? 'selected' : ''}>ครู</option>
+        <option value="administrator" ${isAdministrator ? 'selected' : ''}>ผู้บริหาร</option>`;
     const deptOpts = `<option value="">-- เลือกกลุ่มสาระ --</option>`
         + depts.map(d => `<option ${dVal === d ? 'selected' : ''}>${d}</option>`).join('')
         + `<option value="other" ${isOtherDept ? 'selected' : ''}>อื่นๆ (โปรดระบุ)</option>`;
@@ -4452,8 +4508,11 @@ function renderEditTeacherRow(t, idx) {
             <input type="text" value="${escAttr(t.lastname)}" placeholder="นามสกุล" class="edit-tch-lastname col-span-1 px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none">
         </div>
         <input type="text" value="${isOtherPrefix ? escAttr(pVal) : ''}" placeholder="ระบุคำนำหน้า..." class="edit-tch-prefix-other w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none mb-1.5 ${isOtherPrefix ? '' : 'hidden'}">
-        <select class="edit-tch-dept w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none" onchange="toggleEditTchDeptOther(this)">${deptOpts}</select>
-        <input type="text" value="${isOtherDept ? escAttr(dVal) : ''}" placeholder="ระบุกลุ่มสาระ/งาน..." class="edit-tch-dept-other w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none mt-1.5 ${isOtherDept ? '' : 'hidden'}">
+        <select class="edit-tch-role w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none mb-1.5" onchange="toggleEditTchRole(this)">${roleOpts}</select>
+        <div class="edit-tch-dept-container ${isAdministrator ? 'hidden' : ''}">
+            <select class="edit-tch-dept w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none" onchange="toggleEditTchDeptOther(this)">${deptOpts}</select>
+            <input type="text" value="${isOtherDept ? escAttr(dVal) : ''}" placeholder="ระบุกลุ่มสาระ/งาน..." class="edit-tch-dept-other w-full px-2 py-1.5 border border-gray-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-white outline-none mt-1.5 ${isOtherDept ? '' : 'hidden'}">
+        </div>
     </div>`;
 }
 
@@ -4468,6 +4527,21 @@ function toggleEditTchDeptOther(sel) {
     else { otherInput.classList.add('hidden'); otherInput.value = ''; }
 }
 
+function toggleEditTchRole(sel) {
+    const row = sel.closest('[data-teacher-idx]');
+    const deptContainer = row.querySelector('.edit-tch-dept-container');
+    const deptSelect = row.querySelector('.edit-tch-dept');
+    const deptOther = row.querySelector('.edit-tch-dept-other');
+    const isAdministrator = sel.value === 'administrator';
+
+    deptContainer.classList.toggle('hidden', isAdministrator);
+    if (isAdministrator) {
+        deptSelect.value = '';
+        deptOther.value = '';
+        deptOther.classList.add('hidden');
+    }
+}
+
 function addEditStudent() {
     const list = document.getElementById('edit-students-list');
     const idx = list.children.length;
@@ -4478,7 +4552,7 @@ function addEditStudent() {
 function addEditTeacher() {
     const list = document.getElementById('edit-teachers-list');
     const idx = list.children.length;
-    list.insertAdjacentHTML('beforeend', renderEditTeacherRow({ prefix: 'นาย', firstname: '', lastname: '', department: '' }, idx));
+    list.insertAdjacentHTML('beforeend', renderEditTeacherRow({ roleType: 'teacher', prefix: 'นาย', firstname: '', lastname: '', department: '' }, idx));
     lucide.createIcons();
 }
 
@@ -4567,9 +4641,12 @@ function collectEditTeachers() {
     return Array.from(rows).map(row => {
         let prefix = row.querySelector('.edit-tch-prefix')?.value?.trim() || '';
         if (prefix === 'other') prefix = row.querySelector('.edit-tch-prefix-other')?.value?.trim() || '';
+        const roleType = row.querySelector('.edit-tch-role')?.value || 'teacher';
         let dept = row.querySelector('.edit-tch-dept')?.value?.trim() || '';
         if (dept === 'other') dept = row.querySelector('.edit-tch-dept-other')?.value?.trim() || '';
+        if (roleType === 'administrator') dept = '';
         return {
+            roleType,
             prefix,
             firstname: row.querySelector('.edit-tch-firstname')?.value?.trim() || '',
             lastname: row.querySelector('.edit-tch-lastname')?.value?.trim() || '',
@@ -4610,7 +4687,12 @@ async function submitEditAward() {
         grade: s.grade,
         room: s.room
     }));
-    const editTeachers = collectEditTeachers().map(t => ({
+    const collectedEditTeachers = collectEditTeachers();
+    if (collectedEditTeachers.some(t => getPersonRoleType(t) === 'teacher' && !t.department)) {
+        return showToast('กรุณาระบุกลุ่มสาระฯ สำหรับครู', 'warning');
+    }
+    const editTeachers = collectedEditTeachers.map(t => ({
+        roleType: t.roleType,
         prefix: t.prefix,
         name: (t.firstname + ' ' + t.lastname).trim(),
         department: t.department
@@ -4693,6 +4775,79 @@ async function submitEditAward() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i> บันทึกการแก้ไข';
+        lucide.createIcons();
+    }
+}
+
+async function deleteAward() {
+    const id = document.getElementById('edit-award-id').value;
+    if (!id) return showToast('ไม่พบ ID รายการ', 'error');
+
+    const token = localStorage.getItem('authToken');
+    if (!token) return showToast('กรุณาเข้าสู่ระบบใหม่', 'error');
+
+    // Confirm deletion with SweetAlert2
+    const confirmResult = await Swal.fire({
+        title: 'ยืนยันการลบผลงาน?',
+        text: "คุณต้องการลบข้อมูลรางวัลนี้ใช่หรือไม่? การลบแล้วจะไม่สามารถกู้คืนได้",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#EF4444',
+        cancelButtonColor: '#6B7280',
+        confirmButtonText: 'ใช่, ลบเลย!',
+        cancelButtonText: 'ยกเลิก',
+        customClass: {
+            popup: 'rounded-2xl',
+            confirmButton: 'rounded-xl font-bold px-6 py-2.5',
+            cancelButton: 'rounded-xl font-bold px-6 py-2.5'
+        }
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
+    const deleteBtn = document.getElementById('edit-award-delete-btn');
+    const submitBtn = document.getElementById('edit-award-submit-btn');
+
+    // Set loading state
+    deleteBtn.disabled = true;
+    submitBtn.disabled = true;
+    const originalDeleteHTML = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> กำลังลบ...';
+    lucide.createIcons();
+
+    const payload = {
+        action: 'delete_award',
+        token: token,
+        id: id
+    };
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('ลบผลงานเรียบร้อยแล้ว', 'success');
+            closeModal('edit-award-modal');
+
+            // Remove from local groupedData array
+            groupedData = groupedData.filter(d => d.id !== id);
+
+            // Re-render My Awards and Dashboard UI
+            renderMyAwards();
+            handleSearch();
+        } else {
+            showToast(result.message || 'ลบไม่สำเร็จ', 'error');
+        }
+    } catch (err) {
+        console.error('Delete Award Error:', err);
+        showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+    } finally {
+        deleteBtn.disabled = false;
+        submitBtn.disabled = false;
+        deleteBtn.innerHTML = originalDeleteHTML;
         lucide.createIcons();
     }
 }
