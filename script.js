@@ -2697,67 +2697,9 @@ function savePendingRewardsPDF() {
         return iA - iB;
     });
 
-    let rows = '';
-    let num = 1;
-    sortedDepts.forEach(dept => {
-        rows += `<tr class="dept-row"><td colspan="7">${dept}</td></tr>`;
-        groups[dept].sort((a, b) => {
-            const wA = getLevelWeight(a.level) * 100 + getRankWeight(a.rank);
-            const wB = getLevelWeight(b.level) * 100 + getRankWeight(b.rank);
-            return wB - wA;
-        });
-        groups[dept].forEach(item => {
-            const stdStr = (item.students || []).map(s => `${s.prefix || ''}${s.name} (${s.grade}/${s.room})`).join('<br>');
-            const tchStr = (item.teachers || []).map(t => `${t.prefix || ''}${t.name}`).join('<br>');
-            const dateStr = item.awardDate ? normalizeDate(item.awardDate).toLocaleDateString('th-TH', { dateStyle: 'medium' }) : '-';
-            rows += `<tr>
-                <td class="center">${num++}</td>
-                <td>${item.competition || '-'}<br><small>${dateStr}</small></td>
-                <td class="center">${item.rank || '-'}</td>
-                <td class="center">${item.level || '-'}</td>
-                <td>${item.organizer || '-'}</td>
-                <td>${stdStr || '-'}</td>
-                <td>${tchStr || '-'}</td>
-            </tr>`;
-        });
-    });
-
-    const fullHTML = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<title>รายงานสรุปเหรียญรางวัล</title>
-<style>
-@page { size: A4 landscape; margin: 10mm; }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Sarabun', 'Noto Sans Thai', Tahoma, sans-serif; font-size: 10px; color: #222; line-height: 1.4; }
-h2 { text-align: center; font-size: 16px; margin-bottom: 2px; }
-.subtitle { text-align: center; font-size: 10px; color: #888; margin-bottom: 10px; }
-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-th, td { border: 1px solid #aaa; padding: 4px 6px; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
-th { background: #e2e8f0; font-weight: bold; text-align: center; padding: 6px; }
-td.center { text-align: center; }
-small { color: #888; font-size: 9px; }
-tr.dept-row td { background: #fde047; font-weight: bold; text-align: center; font-size: 11px; padding: 5px; }
-tbody tr { page-break-inside: avoid; }
-col.c1 { width: 3%; } col.c2 { width: 22%; } col.c3 { width: 10%; }
-col.c4 { width: 10%; } col.c5 { width: 12%; } col.c6 { width: 25%; } col.c7 { width: 18%; }
-.no-print { margin-top: 12px; text-align: center; }
-.no-print button { padding: 8px 24px; font-size: 13px; cursor: pointer; border: none; border-radius: 6px; font-weight: bold; }
-.btn-print { background: #2563eb; color: #fff; }
-@media print { .no-print { display: none; } }
-</style>
-</head><body>
-<h2>รายงานสรุปรางวัลที่รอรับ</h2>
-<p class="subtitle">จำนวน ${pendingRewardData.length} รายการ &bull; พิมพ์เมื่อ ${new Date().toLocaleDateString('th-TH', { dateStyle: 'long' })}</p>
-<table>
-<colgroup><col class="c1"><col class="c2"><col class="c3"><col class="c4"><col class="c5"><col class="c6"><col class="c7"></colgroup>
-<thead><tr><th>#</th><th>รายการแข่งขัน</th><th>รางวัล</th><th>ระดับ</th><th>หน่วยงาน</th><th>นักเรียน</th><th>ครูที่ปรึกษา</th></tr></thead>
-<tbody>${rows}</tbody>
-</table>
-<div class="no-print">
-<button class="btn-print" onclick="window.print()">🖨️ บันทึก PDF / พิมพ์</button>
-<p style="margin-top:8px;font-size:11px;color:#888;">เลือก "Save as PDF" ในหน้าต่าง Print เพื่อบันทึกเป็น PDF</p>
-</div>
-</body></html>`;
+    const fullHTML = buildHonorReport(groups, sortedDepts,
+        item => getLevelWeight(item.level) * 100 + getRankWeight(item.rank),
+        date => normalizeDate(date).toLocaleDateString('th-TH', { dateStyle: 'medium' }));
 
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -3424,7 +3366,7 @@ function markAsReceived(index, type) {
 }
 
 function printPendingRewards() {
-    window.print();
+    savePendingRewardsPDF();
 }
 
 // --- REWARD TAB SYSTEM ---
