@@ -1,6 +1,7 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const buildReport = require('../honor-report');
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
+import { buildHonorReport as buildReport } from '../js/reports/honor-report.js';
 const award = {
     competition: 'การแข่งขันตอบปัญหาภาษาไทย', rank: 'ชนะเลิศ', level: 'ประเทศ',
     organizer: 'โรงเรียนตัวอย่าง', students: Array.from({length: 53}, (_, i) =>
@@ -21,4 +22,4 @@ test('ranked records retain dates and escape participant input', () => {
     assert.ok(html.includes('&lt;b&gt;&amp;'));
     assert.ok(html.includes('วันที่ตัวอย่าง'));
 });
-if (process.argv[2]) require('node:fs').writeFileSync(process.argv[2], render([award]));
+if (process.argv[2]) writeFileSync(process.argv[2], render([award]));

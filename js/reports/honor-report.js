@@ -1,4 +1,4 @@
-function buildHonorReport(groups, sortedDepts, score, formatDate) {
+export function buildHonorReport(groups, sortedDepts, score, formatDate) {
     function escape(value) {
         return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
     }
@@ -44,6 +44,5 @@ tbody,tr { break-inside:avoid; }
 small { display:block; font-size:8pt; }
 button { margin:4mm 0; padding:2mm 5mm; }
 @media print { button { display:none; } }
-</style><body><button onclick="window.print()">บันทึก PDF / พิมพ์</button><h1>รางวัลเชิดชูเกียรติที่รอรับ</h1>${tables}</body></html>`;
+</style><body><button type="button" class="btn-print">บันทึก PDF / พิมพ์</button><h1>รางวัลเชิดชูเกียรติที่รอรับ</h1>${tables}</body></html>`;
 }
-if (typeof module !== 'undefined' && module.exports) module.exports = buildHonorReport;

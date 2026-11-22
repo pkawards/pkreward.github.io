@@ -13,7 +13,7 @@
 ## วิธีติดตั้งและใช้งาน
 
 ### 1. การนำขึ้น GitHub Pages
-1. อัปโหลดไฟล์ทั้งหมด (`index.html`, `style.css`, `script.js`, `README.md`) ขึ้นไปที่ GitHub Repository ของคุณ
+1. อัปโหลด `index.html`, `style.css` และโฟลเดอร์ `js/` กับ `assets/` ขึ้นไปที่ GitHub Repository โดยคงโครงสร้างโฟลเดอร์ไว้ เบราว์เซอร์โหลดโมดูล JavaScript โดยตรง จึงเผยแพร่ได้โดยไม่ต้อง build
 2. ไปที่แถบ **Settings** > เลือกเมนู **Pages** ด้านซ้ายมือ
 3. ตรงหัวข้อ **Source** ให้เลือก Branch เป็น `main` (หรือ `master`)
 4. กดปุ่ม **Save**
@@ -21,18 +21,20 @@
 
 ### 2. การตั้งค่า (Configuration)
 เว็บนี้จะเชื่อมต่อกับระบบหลังบ้านที่เป็น Google Apps Script (GAS)
-ถ้าต้องการเปลี่ยน URL ของ Backend ให้เข้าไปแก้ที่ไฟล์ `script.js` บรรทัดที่ 5 ครับ:
-
-```javascript
-const API_URL = "https://script.google.com/macros/s/AKfycbzGlRlOg6xE0P8z8EUH0lGOVRvM5GvcdtGGBqySEOxPslwhW2adcxPonazUYUjM30VG6Q/exec";
-```
+ตั้งค่า URL ของ Google Apps Script ที่ `API_URL` ใน `js/core/api.js`
 
 ### 3. โครงสร้างไฟล์
 - index.html: โครงสร้างหลักของหน้าเว็บ
 
 - style.css: ไฟล์ตกแต่งหน้าตาและลูกเล่นต่างๆ
 
-- script.js: โค้ดควบคุมการทำงาน เชื่อมต่อ API และจัดการหน้าจอ
+- `js/app.js` เริ่มแอป โหลดรายการรางวัล และสลับหน้า
+- `js/features/` จัดการล็อกอิน แดชบอร์ด สรุปกลุ่มสาระ ฟอร์มบันทึก ผลงานของฉัน และการรับรางวัล
+- `js/core/`, `js/domain/`, `js/ui/` และ `js/reports/` เก็บส่วนที่ใช้ร่วมกันและโค้ดส่งออกรายงาน
+
+### ทดสอบในเครื่อง
+
+รัน `python -m http.server 8000` จากโฟลเดอร์โปรเจกต์ แล้วเปิด `http://localhost:8000/` เพื่อให้เบราว์เซอร์โหลด ES modules ผ่าน HTTP
 
 ### เทคโนโลยีที่ใช้
 - HTML5 / CSS3 / JavaScript (ES6+)
