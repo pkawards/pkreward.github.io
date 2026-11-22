@@ -46,10 +46,11 @@ test('the PDF builder uses the pending items supplied by its caller', () => {
             teachers: [{ name: 'Teacher A' }]
         }
     ];
-    const report = buildPendingRewardsPrintHTML(ranking, new Date(2026, 0, 10));
+    const report = buildPendingRewardsPrintHTML(ranking);
 
-    assert.match(report, /จำนวน 2 รายการ/);
-    assert.match(report, /Student A \(1\/2\)/);
+    assert.match(report, /รางวัลเชิดชูเกียรติที่รอรับ/);
+    assert.equal((report.match(/<tbody>/g) || []).length, 2);
+    assert.match(report, /<td>Student A<\/td><td>1<\/td><td>2<\/td>/);
     assert.match(report, /Teacher A/);
     assert.ok(report.indexOf('International award') < report.indexOf('School award'));
     assert.equal(ranking[0].competition, 'School award');

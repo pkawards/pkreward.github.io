@@ -201,7 +201,7 @@ async function executeBulkAction(action) {
 }
 
 function printPendingRewards() {
-    window.print();
+    savePendingRewardsPDF(pendingRewardData);
 }
 
 // --- REWARD TAB SYSTEM ---
